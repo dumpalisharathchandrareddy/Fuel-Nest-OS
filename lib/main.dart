@@ -5,7 +5,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app.dart';
 import 'core/utils/ist_time.dart';
 import 'core/constants/app_constants.dart';
-import 'core/providers/auth_provider.dart';
 import 'core/services/discord_service.dart';
 import 'shared/theme/app_theme.dart';
 
@@ -15,7 +14,7 @@ void main() async {
   // India time — must init before any date ops
   IstTime.init();
 
-  // Lock to portrait on phones; allow all on tablet/desktop
+  // Orientations
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -23,7 +22,7 @@ void main() async {
     DeviceOrientation.landscapeRight,
   ]);
 
-  // System UI overlay style
+  // System UI style
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -32,11 +31,10 @@ void main() async {
     ),
   );
 
-  // Init central registry Supabase (PUMPora's own, baked into app)
-  // Note: tenant Supabase is initialized dynamically after station code entry
+  // Init central registry Supabase
   await Supabase.initialize(
-    url: AppConstants.registrySupabaseUrl,
-    anonKey: AppConstants.registryAnonKey,
+    url: AppConstants.hasRegistry ? AppConstants.registrySupabaseUrl : 'https://demo.supabase.co',
+    anonKey: AppConstants.hasRegistry ? AppConstants.registryAnonKey : 'demo-anon-key',
     debug: false,
   );
 
@@ -55,24 +53,15 @@ class FuelOSApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    debugPrint('Building FuelOSApp... [STABILITY CHECK]');
     final router = ref.watch(routerProvider);
+    debugPrint('FuelOSApp using router instance: ${router.hashCode}');
 
     return MaterialApp.router(
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
       routerConfig: router,
-      builder: (context, child) {
-        // Enforce text scaling limits for readability
-        return MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.linear(
-              MediaQuery.of(context).textScaler.scale(1.0).clamp(0.85, 1.2),
-            ),
-          ),
-          child: child!,
-        );
-      },
     );
   }
 }

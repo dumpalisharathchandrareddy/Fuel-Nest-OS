@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/providers/auth_provider.dart';
 import '../../../core/services/registry_service.dart';
 import '../../../core/services/tenant_service.dart';
 import '../../../core/utils/currency.dart';
@@ -45,7 +44,10 @@ class _CreditorPortalScreenState extends ConsumerState<CreditorPortalScreen> {
 
   Future<void> _lookupStation() async {
     if (_stationCtrl.text.trim().isEmpty) return;
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final entry = await RegistryService.instance
           .lookupStation(_stationCtrl.text.trim().toUpperCase());
@@ -67,17 +69,24 @@ class _CreditorPortalScreenState extends ConsumerState<CreditorPortalScreen> {
   Future<String?> _getStationId() async {
     try {
       final db = TenantService.instance.client;
-      final row = await db.from('FuelStation')
+      final row = await db
+          .from('FuelStation')
           .select('id')
-          .eq('station_code', TenantService.instance.currentStation?.stationCode ?? '')
+          .eq('station_code',
+              TenantService.instance.currentStation?.stationCode ?? '')
           .single();
       return row['id'] as String?;
-    } catch (_) { return null; }
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _lookupPhone() async {
     if (_phoneCtrl.text.trim().isEmpty) return;
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final db = TenantService.instance.client;
       final phone = _phoneCtrl.text.trim();
@@ -88,13 +97,15 @@ class _CreditorPortalScreenState extends ConsumerState<CreditorPortalScreen> {
           ? await _getStationId()
           : null;
       if (stationId == null) throw Exception('Station not found');
-      
+
       final lookupResult = await db.rpc('fuelos_creditor_lookup', params: {
         'p_station_id': stationId,
         'p_phone': phone,
       });
       final rows = lookupResult as List?;
-      final customer = (rows?.isNotEmpty == true) ? rows!.first as Map<String, dynamic> : null;
+      final customer = (rows?.isNotEmpty == true)
+          ? rows!.first as Map<String, dynamic>
+          : null;
 
       if (customer == null) {
         throw Exception(
@@ -118,7 +129,8 @@ class _CreditorPortalScreenState extends ConsumerState<CreditorPortalScreen> {
       // Compute outstanding from latest remaining_balance
       final latestTx = txList.isNotEmpty ? txList.first as Map : null;
       customer['total_due'] = latestTx != null
-          ? double.tryParse(latestTx['remaining_balance']?.toString() ?? '0') ?? 0
+          ? double.tryParse(latestTx['remaining_balance']?.toString() ?? '0') ??
+              0
           : 0.0;
 
       setState(() {
@@ -176,7 +188,8 @@ class _CreditorPortalScreenState extends ConsumerState<CreditorPortalScreen> {
                         color: AppColors.purpleBg,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                            color: AppColors.purple.withOpacity(0.3)),
+                            color:
+                                AppColors.textPrimary.withValues(alpha: 0.1)),
                       ),
                       child: const Icon(Icons.credit_card,
                           color: AppColors.purple, size: 20),
@@ -200,8 +213,8 @@ class _CreditorPortalScreenState extends ConsumerState<CreditorPortalScreen> {
                       GestureDetector(
                         onTap: _reset,
                         child: const Text('Reset',
-                            style: TextStyle(
-                                color: AppColors.blue, fontSize: 13)),
+                            style:
+                                TextStyle(color: AppColors.blue, fontSize: 13)),
                       ),
                   ],
                 ),
@@ -218,8 +231,8 @@ class _CreditorPortalScreenState extends ConsumerState<CreditorPortalScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.redBg,
                       borderRadius: BorderRadius.circular(8),
-                      border:
-                          Border.all(color: AppColors.red.withOpacity(0.3)),
+                      border: Border.all(
+                          color: AppColors.red.withValues(alpha: 0.3)),
                     ),
                     child: Row(children: [
                       const Icon(Icons.error_outline,
@@ -252,69 +265,67 @@ class _CreditorPortalScreenState extends ConsumerState<CreditorPortalScreen> {
   }
 
   List<Widget> _buildStep1() => [
-    const Text('Enter Station Code',
-        style: TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 22,
-            fontWeight: FontWeight.w800)),
-    const SizedBox(height: 8),
-    const Text(
-        'Enter the code for the fuel station where you have a credit account.',
-        style: TextStyle(
-            color: AppColors.textSecondary, fontSize: 13, height: 1.5)),
-    const SizedBox(height: 24),
-    AppTextField(
-      label: 'Station Code',
-      controller: _stationCtrl,
-      hint: 'e.g. STATION001',
-      prefixIcon: Icons.store_outlined,
-      textCapitalization: TextCapitalization.characters,
-      textInputAction: TextInputAction.done,
-      onSubmitted: (_) => _lookupStation(),
-    ),
-    const SizedBox(height: 20),
-    AppButton(
-      label: 'Continue',
-      onTap: _lookupStation,
-      loading: _loading,
-      width: double.infinity,
-    ),
-  ];
+        const Text('Enter Station Code',
+            style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 22,
+                fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        const Text(
+            'Enter the code for the fuel station where you have a credit account.',
+            style: TextStyle(
+                color: AppColors.textSecondary, fontSize: 13, height: 1.5)),
+        const SizedBox(height: 24),
+        AppTextField(
+          label: 'Station Code',
+          controller: _stationCtrl,
+          hint: 'e.g. STATION001',
+          prefixIcon: Icons.store_outlined,
+          textCapitalization: TextCapitalization.characters,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _lookupStation(),
+        ),
+        const SizedBox(height: 20),
+        AppButton(
+          label: 'Continue',
+          onTap: _lookupStation,
+          loading: _loading,
+          width: double.infinity,
+        ),
+      ];
 
   List<Widget> _buildStep2() => [
-    Text('${_stationName ?? "Station"} Found',
-        style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 22,
-            fontWeight: FontWeight.w800)),
-    const SizedBox(height: 8),
-    const Text('Enter your registered mobile number to view your balance.',
-        style: TextStyle(
-            color: AppColors.textSecondary, fontSize: 13, height: 1.5)),
-    const SizedBox(height: 24),
-    AppTextField(
-      label: 'Mobile Number',
-      controller: _phoneCtrl,
-      hint: '10-digit mobile number',
-      prefixIcon: Icons.phone_outlined,
-      keyboardType: TextInputType.phone,
-      textInputAction: TextInputAction.done,
-      onSubmitted: (_) => _lookupPhone(),
-    ),
-    const SizedBox(height: 20),
-    AppButton(
-      label: 'View Balance',
-      onTap: _lookupPhone,
-      loading: _loading,
-      width: double.infinity,
-    ),
-  ];
+        Text('${_stationName ?? "Station"} Found',
+            style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 22,
+                fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        const Text('Enter your registered mobile number to view your balance.',
+            style: TextStyle(
+                color: AppColors.textSecondary, fontSize: 13, height: 1.5)),
+        const SizedBox(height: 24),
+        AppTextField(
+          label: 'Mobile Number',
+          controller: _phoneCtrl,
+          hint: '10-digit mobile number',
+          prefixIcon: Icons.phone_outlined,
+          keyboardType: TextInputType.phone,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _lookupPhone(),
+        ),
+        const SizedBox(height: 20),
+        AppButton(
+          label: 'View Balance',
+          onTap: _lookupPhone,
+          loading: _loading,
+          width: double.infinity,
+        ),
+      ];
 
   List<Widget> _buildBalance() {
-    final totalDue = __customer!['total_due'] as double? ?? 0.0;
-    final limit = double.tryParse(
-            '0') ??
-        0;
+    final totalDue = _customer!['total_due'] as double? ?? 0.0;
+    final limit = double.tryParse('0') ?? 0;
     final isOverLimit = totalDue > limit;
     final pct = limit > 0 ? (totalDue / limit).clamp(0.0, 1.0) : 0.0;
 
@@ -322,8 +333,8 @@ class _CreditorPortalScreenState extends ConsumerState<CreditorPortalScreen> {
       // Customer summary card
       AppCard(
         borderColor: isOverLimit
-            ? AppColors.red.withOpacity(0.3)
-            : AppColors.green.withOpacity(0.2),
+            ? AppColors.red.withValues(alpha: 0.3)
+            : AppColors.green.withValues(alpha: 0.2),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             Container(
@@ -353,8 +364,7 @@ class _CreditorPortalScreenState extends ConsumerState<CreditorPortalScreen> {
                           fontWeight: FontWeight.w700,
                           fontSize: 16)),
                   if (_customer!['customer_code'] != null)
-                    Text(
-                        _customer!['customer_code'] as String,
+                    Text(_customer!['customer_code'] as String,
                         style: const TextStyle(
                             color: AppColors.textMuted, fontSize: 12)),
                 ],
@@ -421,8 +431,8 @@ class _CreditorPortalScreenState extends ConsumerState<CreditorPortalScreen> {
               ),
               Text(
                 'Available: ${IndianCurrency.format((limit - totalDue).clamp(0, double.infinity))}',
-                style: const TextStyle(
-                    color: AppColors.textMuted, fontSize: 11),
+                style:
+                    const TextStyle(color: AppColors.textMuted, fontSize: 11),
               ),
             ],
           ),
@@ -440,93 +450,93 @@ class _CreditorPortalScreenState extends ConsumerState<CreditorPortalScreen> {
             child: Text('No transactions yet',
                 style: TextStyle(color: AppColors.textMuted))),
       ..._transactions.take(10).map((t) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: AppCard(
-          child: Row(children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                  color: AppColors.redBg,
-                  borderRadius: BorderRadius.circular(8)),
-              child: const Icon(Icons.arrow_upward,
-                  color: AppColors.red, size: 14),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text(
-                  '${t['fuel_type'] ?? 'Fuel'} — ${IndianCurrency.formatLitres(double.tryParse(t['liters']?.toString() ?? '0') ?? 0)}',
-                  style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w500,
-                      fontSize: 13),
+            padding: const EdgeInsets.only(bottom: 8),
+            child: AppCard(
+              child: Row(children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                      color: AppColors.redBg,
+                      borderRadius: BorderRadius.circular(8)),
+                  child: const Icon(Icons.arrow_upward,
+                      color: AppColors.red, size: 14),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${t['fuel_type'] ?? 'Fuel'} — ${IndianCurrency.formatLitres(double.tryParse(t['liters']?.toString() ?? '0') ?? 0)}',
+                          style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 13),
+                        ),
+                        Text(
+                          IstTime.formatDate(DateTime.parse(
+                              t['created_at'] as String? ??
+                                  DateTime.now().toIso8601String())),
+                          style: const TextStyle(
+                              color: AppColors.textMuted, fontSize: 11),
+                        ),
+                      ]),
                 ),
                 Text(
-                  IstTime.formatDate(DateTime.parse(
-                      t['created_at'] as String? ??
-                          DateTime.now().toIso8601String())),
+                  IndianCurrency.format(
+                      double.tryParse(t['amount']?.toString() ?? '0') ?? 0),
                   style: const TextStyle(
-                      color: AppColors.textMuted, fontSize: 11),
+                      color: AppColors.red, fontWeight: FontWeight.w600),
                 ),
               ]),
             ),
-            Text(
-              IndianCurrency.format(
-                  double.tryParse(t['amount']?.toString() ?? '0') ?? 0),
-              style: const TextStyle(
-                  color: AppColors.red, fontWeight: FontWeight.w600),
-            ),
-          ]),
-        ),
-      )),
+          )),
 
       if (_payments.isNotEmpty) ...[
         const SizedBox(height: 20),
         SectionHeader(title: 'Payments Made (${_payments.length})'),
         const SizedBox(height: 12),
         ..._payments.take(10).map((p) => Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: AppCard(
-            child: Row(children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                    color: AppColors.greenBg,
-                    borderRadius: BorderRadius.circular(8)),
-                child: const Icon(Icons.arrow_downward,
-                    color: AppColors.green, size: 14),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                  Text(
-                    p['payment_mode'] as String? ?? 'Payment',
-                    style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w500,
-                        fontSize: 13),
+              padding: const EdgeInsets.only(bottom: 8),
+              child: AppCard(
+                child: Row(children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                        color: AppColors.red.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4)),
+                    child: const Icon(Icons.arrow_downward,
+                        color: AppColors.green, size: 14),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            p['payment_mode'] as String? ?? 'Payment',
+                            style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w500,
+                                fontSize: 13),
+                          ),
+                          Text(
+                            IstTime.formatDate(DateTime.parse(
+                                p['created_at'] as String? ??
+                                    DateTime.now().toIso8601String())),
+                            style: const TextStyle(
+                                color: AppColors.textMuted, fontSize: 11),
+                          ),
+                        ]),
                   ),
                   Text(
-                    IstTime.formatDate(DateTime.parse(
-                        p['created_at'] as String? ??
-                            DateTime.now().toIso8601String())),
+                    '+ ${IndianCurrency.format(double.tryParse(p['paid_amount']?.toString() ?? '0') ?? 0)}',
                     style: const TextStyle(
-                        color: AppColors.textMuted, fontSize: 11),
+                        color: AppColors.green, fontWeight: FontWeight.w600),
                   ),
                 ]),
               ),
-              Text(
-                '+ ${IndianCurrency.format(double.tryParse(p['paid_amount']?.toString() ?? '0') ?? 0)}',
-                style: const TextStyle(
-                    color: AppColors.green, fontWeight: FontWeight.w600),
-              ),
-            ]),
-          ),
-        )),
+            )),
       ],
     ];
   }

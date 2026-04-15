@@ -100,7 +100,8 @@ const _bottomNavPaths = [
 
 class MainShell extends ConsumerStatefulWidget {
   final Widget child;
-  const MainShell({super.key, required this.child});
+  final GoRouterState state;
+  const MainShell({super.key, required this.child, required this.state});
 
   @override
   ConsumerState<MainShell> createState() => _MainShellState();
@@ -122,17 +123,24 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   // ── Desktop: full sidebar ─────────────────────────────────────────────────
   Widget _buildDesktopLayout(BuildContext context) {
+    final loc = widget.state.matchedLocation;
+    final user = ref.watch(currentUserProvider);
     return Scaffold(
       backgroundColor: AppColors.bgApp,
       body: Row(
         children: [
           _Sidebar(
+            loc: loc,
             expanded: _sidebarExpanded,
             onToggle: () =>
                 setState(() => _sidebarExpanded = !_sidebarExpanded),
           ),
           const VerticalDivider(width: 1, color: AppColors.border),
-          Expanded(child: widget.child),
+          Expanded(
+            child: user == null
+                ? const Center(child: CircularProgressIndicator())
+                : widget.child,
+          ),
         ],
       ),
     );
@@ -140,7 +148,8 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   // ── Tablet: rail navigation ───────────────────────────────────────────────
   Widget _buildTabletLayout(BuildContext context) {
-    final loc = GoRouterState.of(context).matchedLocation;
+    final loc = widget.state.matchedLocation;
+    final user = ref.watch(currentUserProvider);
     final selectedIdx = _navItems.indexWhere((i) => i.path == loc);
 
     return Scaffold(
@@ -162,7 +171,11 @@ class _MainShellState extends ConsumerState<MainShell> {
             trailing: const _UserChip(collapsed: true),
           ),
           const VerticalDivider(width: 1, color: AppColors.border),
-          Expanded(child: widget.child),
+          Expanded(
+            child: user == null
+                ? const Center(child: CircularProgressIndicator())
+                : widget.child,
+          ),
         ],
       ),
     );
@@ -170,7 +183,8 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   // ── Mobile: bottom navigation ─────────────────────────────────────────────
   Widget _buildMobileLayout(BuildContext context) {
-    final loc = GoRouterState.of(context).matchedLocation;
+    final loc = widget.state.matchedLocation;
+    final user = ref.watch(currentUserProvider);
     final bottomItems =
         _navItems.where((i) => _bottomNavPaths.contains(i.path)).toList();
     final selectedIdx = bottomItems.indexWhere((i) => i.path == loc);
@@ -178,7 +192,9 @@ class _MainShellState extends ConsumerState<MainShell> {
     return Scaffold(
       backgroundColor: AppColors.bgApp,
       appBar: _MobileAppBar(currentPath: loc),
-      body: widget.child,
+      body: user == null
+          ? const Center(child: CircularProgressIndicator())
+          : widget.child,
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedIdx < 0 ? 0 : selectedIdx,
         onDestinationSelected: (i) => context.go(bottomItems[i].path),
@@ -198,14 +214,15 @@ class _MainShellState extends ConsumerState<MainShell> {
 // ── Desktop Sidebar ───────────────────────────────────────────────────────────
 
 class _Sidebar extends ConsumerWidget {
+  final String loc;
   final bool expanded;
   final VoidCallback onToggle;
 
-  const _Sidebar({required this.expanded, required this.onToggle});
+  const _Sidebar(
+      {required this.loc, required this.expanded, required this.onToggle});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final loc = GoRouterState.of(context).matchedLocation;
     final width = expanded ? 210.0 : 52.0;
     final user = ref.watch(currentUserProvider);
     final stationName = ref.watch(stationNameProvider);
@@ -327,7 +344,7 @@ class _SidebarItem extends StatelessWidget {
             color: active ? AppColors.bgActive : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             border: active
-                ? Border.all(color: AppColors.blue.withOpacity(0.2))
+                ? Border.all(color: AppColors.purple.withValues(alpha: 0.1))
                 : null,
           ),
           child: Row(

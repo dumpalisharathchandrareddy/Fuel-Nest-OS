@@ -38,7 +38,6 @@ class AppButton extends StatelessWidget {
       width: width,
       child: Material(
         color: bg,
-        borderRadius: BorderRadius.circular(8),
         shape: secondary
             ? RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -318,6 +317,7 @@ class KpiCard extends StatelessWidget {
       onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
@@ -331,7 +331,7 @@ class KpiCard extends StatelessWidget {
               ),
               const Spacer(),
               if (onTap != null)
-                Icon(
+                const Icon(
                   Icons.arrow_forward_ios,
                   size: 12,
                   color: AppColors.textMuted,
@@ -339,30 +339,44 @@ class KpiCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Text(
-            value,
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.5,
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.5,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 2),
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 12,
+          Flexible(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           if (subValue != null) ...[
             const SizedBox(height: 4),
-            Text(
-              subValue!,
-              style: const TextStyle(
-                color: AppColors.textMuted,
-                fontSize: 11,
+            Flexible(
+              child: Text(
+                subValue!,
+                style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 11,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -644,28 +658,40 @@ class ShareBottomSheet extends StatelessWidget {
               icon: Icons.picture_as_pdf,
               label: 'Download PDF',
               color: AppColors.red,
-              onTap: () { Navigator.pop(context); onSharePdf!(); },
+              onTap: () {
+                Navigator.pop(context);
+                onSharePdf!();
+              },
             ),
           if (onShareExcel != null)
             _ShareTile(
               icon: Icons.table_chart,
               label: 'Download Excel',
               color: AppColors.green,
-              onTap: () { Navigator.pop(context); onShareExcel!(); },
+              onTap: () {
+                Navigator.pop(context);
+                onShareExcel!();
+              },
             ),
           if (onShareWhatsApp != null)
             _ShareTile(
               icon: Icons.chat,
               label: 'Share via WhatsApp',
               color: const Color(0xFF25D366),
-              onTap: () { Navigator.pop(context); onShareWhatsApp!(); },
+              onTap: () {
+                Navigator.pop(context);
+                onShareWhatsApp!();
+              },
             ),
           if (onShareDiscord != null)
             _ShareTile(
               icon: Icons.discord,
               label: 'Send to Discord',
               color: const Color(0xFF5865F2),
-              onTap: () { Navigator.pop(context); onShareDiscord!(); },
+              onTap: () {
+                Navigator.pop(context);
+                onShareDiscord!();
+              },
             ),
           const SizedBox(height: 16),
         ],
@@ -694,7 +720,7 @@ class _ShareTile extends StatelessWidget {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
+          color: color.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(icon, color: color, size: 20),

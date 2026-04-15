@@ -12,6 +12,9 @@ class RegistryService {
   SupabaseClient? _client;
 
   SupabaseClient get _registry {
+    if (!AppConstants.hasRegistry) {
+      throw Exception('Registry not configured. Please provide REGISTRY_URL and REGISTRY_ANON_KEY.');
+    }
     _client ??= SupabaseClient(
       AppConstants.registrySupabaseUrl,
       AppConstants.registryAnonKey,

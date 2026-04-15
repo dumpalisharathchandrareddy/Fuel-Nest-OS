@@ -145,7 +145,7 @@ class _PayrollDashboardScreenState extends ConsumerState<PayrollDashboardScreen>
               Text(s['full_name'] as String, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
               Text(config != null ? 'Base: ${IndianCurrency.format(double.tryParse(config['base_monthly_salary']?.toString() ?? '0') ?? 0)}' : 'No salary config', style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
             ])),
-            if (config != null) IconButton(icon: const Icon(Icons.payments, color: AppColors.green, size: 22), onPressed: () => _recordPayout(s), tooltip: 'Record Payout'),
+            if (config != null) IconButton(icon: const Icon(Icons.payments, color: AppColors.green, size: 22), onPressed: () => _recordPayout(s as Map<String, dynamic>), tooltip: 'Record Payout'),
           ])));
         }),
         const SizedBox(height: 20),

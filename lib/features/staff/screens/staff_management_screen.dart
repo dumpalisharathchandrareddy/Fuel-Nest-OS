@@ -38,7 +38,11 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
     });
     try {
       final db = TenantService.instance.client;
-      final user = ref.read(currentUserProvider)!;
+      final user = ref.read(currentUserProvider);
+      if (user == null) {
+        setState(() => _loading = false);
+        return;
+      }
       final results = await Future.wait([
         db
             .from('User')
@@ -193,7 +197,9 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
                   margin: EdgeInsets.only(right: r == 'MANAGER' ? 8 : 0),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                      color: sel ? color.withOpacity(0.15) : AppColors.bgCard,
+                      color: sel
+                          ? color.withValues(alpha: 0.15)
+                          : AppColors.bgCard,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                           color: sel ? color : AppColors.border,
@@ -399,7 +405,9 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
       empIdCtrl,
       usernameCtrl,
       salaryCtrl
-    ]) c.dispose();
+    ]) {
+      c.dispose();
+    }
   }
 
   // ── Set PIN ──────────────────────────────────────────────────────────────────
@@ -472,11 +480,12 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
                               if (ctx.mounted) {
                                 Navigator.pop(ctx);
                               }
-                              if (mounted)
+                              if (mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
                                         content: Text('✅ PIN set successfully'),
                                         backgroundColor: AppColors.green));
+                              }
                             } catch (e) {
                               ss(() {
                                 submitting = false;
@@ -519,9 +528,10 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
       }).eq('id', staffMember['id']);
       _fetch();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
   }
 
@@ -569,10 +579,11 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
           'active': false,
           'updated_at': DateTime.now().toUtc().toIso8601String()
         }).eq('id', staffMember['id']);
-        if (mounted)
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
               content: Text('✅ Staff archived'),
               backgroundColor: AppColors.green));
+        }
       } else {
         await db.from('StaffArchiveRequest').insert({
           'station_id': user.stationId,
@@ -583,15 +594,17 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
           'status': 'PENDING',
           'created_at': DateTime.now().toUtc().toIso8601String(),
         });
-        if (mounted)
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
               content: Text('✅ Archive request sent to dealer')));
+        }
       }
       _fetch();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
     reasonCtrl.dispose();
   }
@@ -611,14 +624,16 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
             'id', (req['target_user'] as Map)['id']);
       }
       _fetch();
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(approve ? '✅ Staff archived' : 'Request rejected'),
             backgroundColor: approve ? AppColors.green : null));
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
   }
 
@@ -629,13 +644,15 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
     final isManager = user?.isManagerOrDealer ?? false;
     final filtered = _filtered;
 
-    if (_loading)
+    if (_loading) {
       return const Scaffold(
           backgroundColor: AppColors.bgApp, body: LoadingView());
-    if (_error != null)
+    }
+    if (_error != null) {
       return Scaffold(
           backgroundColor: AppColors.bgApp,
           body: ErrorView(message: _error!, onRetry: _fetch));
+    }
 
     return Scaffold(
       backgroundColor: AppColors.bgApp,
@@ -663,7 +680,7 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
                     ..._archiveRequests.map((req) => Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: AppCard(
-                            borderColor: AppColors.amber.withOpacity(0.3),
+                            borderColor: AppColors.amber.withValues(alpha: 0.3),
                             child: Row(children: [
                               Expanded(
                                   child: Column(
@@ -791,7 +808,7 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
                                 height: 44,
                                 decoration: BoxDecoration(
                                     color: isActive
-                                        ? roleColor.withOpacity(0.12)
+                                        ? roleColor.withValues(alpha: 0.12)
                                         : AppColors.bgHover,
                                     borderRadius: BorderRadius.circular(12)),
                                 alignment: Alignment.center,

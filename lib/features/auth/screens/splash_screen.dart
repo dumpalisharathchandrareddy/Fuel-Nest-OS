@@ -3,7 +3,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/providers/auth_provider.dart';
 
@@ -30,23 +29,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   Future<void> _init() async {
+    // Initialize the auth state.
+    // GoRouter's refreshListenable will detect the change and handle redirection.
     await ref.read(authProvider.notifier).initialize();
-    if (!mounted) return;
-    await Future.delayed(const Duration(milliseconds: 1200));
-    if (!mounted) return;
-    final auth = ref.read(authProvider);
-    if (auth.isLoggedIn) {
-      final role = auth.user!.role;
-      if (role == 'PUMP_PERSON') {
-        context.go('/worker');
-      } else {
-        context.go('/app/dashboard');
-      }
-    } else if (auth.stationConfigured) {
-      context.go('/login');
-    } else {
-      context.go('/station');
-    }
+
+    // Small delay for the fade animation to show
+    await Future.delayed(const Duration(milliseconds: 1500));
   }
 
   @override
@@ -71,7 +59,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                 decoration: BoxDecoration(
                   color: AppColors.blueBg,
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: AppColors.blue.withOpacity(0.3)),
+                  border:
+                      Border.all(color: AppColors.blue.withValues(alpha: 0.3)),
                 ),
                 child: const Icon(Icons.local_gas_station,
                     color: AppColors.blue, size: 36),

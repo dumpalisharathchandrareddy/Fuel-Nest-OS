@@ -1,6 +1,5 @@
-import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/auth_user.dart';
 import '../constants/app_constants.dart';
 import 'tenant_service.dart';
@@ -35,58 +34,84 @@ class AuthService {
     return entry.stationName;
   }
 
-  /// Step 2a: Login as Dealer or Manager or Staff.
-  /// identifier = username or employee_id
+  /// Step 2a: Unified login for all roles using Phone Number + PIN/Password.
+  /// identifier = phone number
   /// credential = password or PIN
-  /// role = 'DEALER' | 'MANAGER' | 'PUMP_PERSON'
-  Future<AuthUser> loginStaff({
+  /// role = DEALER | MANAGER | STAFF | PUMP_PERSON
+  Future<AuthUser> loginUnified({
     required String identifier,
     required String credential,
     required String role,
     bool isPin = false,
   }) async {
-    final db = TenantService.instance.client;
-    final stationCode =
-        TenantService.instance.currentStation?.stationCode ?? '';
+    final curStation = TenantService.instance.currentStation;
+    final stationCode = curStation?.stationCode ?? '';
 
-    // Call the Supabase Edge Function for auth
-    // This Edge Function validates credentials and returns user data + session
-    final response = await db.functions.invoke(
-      'auth-login',
-      body: {
-        'identifier': identifier.trim(),
-        'credential': credential,
-        'role': role,
-        'is_pin': isPin,
-        'station_code': stationCode,
-      },
-    );
-
-    if (response.status != 200) {
-      final error = response.data?['error'] ?? 'Login failed';
-      throw Exception(error.toString());
-    }
-
-    final data = response.data as Map<String, dynamic>;
-    final user = AuthUser.fromJson({
-      ...data['user'] as Map<String, dynamic>,
-      'station_code': stationCode,
-      'station_name': TenantService.instance.currentStation?.stationName ?? '',
-      'access_token': data['access_token'],
-      'refresh_token': data['refresh_token'],
-    });
-
-    // Set Supabase session so RLS works for subsequent calls
-    if (data['access_token'] != null && data['refresh_token'] != null) {
-      await TenantService.instance.setSession(
-        data['access_token'] as String,
-        data['refresh_token'] as String,
+    // Demo Mode: only fires for the DEMO001 station code
+    if (stationCode == 'DEMO001') {
+      return AuthUser(
+        id: 'demo-user-id',
+        stationId: 'demo-station-id',
+        stationCode: 'DEMO001',
+        stationName: curStation?.stationName ?? 'FuelOS Demo Station',
+        role: 'MANAGER',
+        fullName: 'Demo Manager',
       );
     }
 
-    _currentUser = user;
-    await _persistUser(user);
-    return user;
+    final db = TenantService.instance.client;
+
+    try {
+      // Call the Supabase Edge Function for auth
+      final response = await db.functions.invoke(
+        'auth-login',
+        body: {
+          'identifier': identifier.trim(),
+          'credential': credential,
+          'station_code': stationCode,
+          'role': role,
+          'is_pin': isPin,
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.status != 200) {
+        final error = response.data?['error'] ?? 'Login failed';
+        throw Exception(error.toString());
+      }
+
+      final data = response.data as Map<String, dynamic>;
+      final user = AuthUser.fromJson({
+        ...data['user'] as Map<String, dynamic>,
+        'station_code': stationCode,
+        'station_name': curStation?.stationName ?? '',
+        'access_token': data['access_token'],
+        'refresh_token': data['refresh_token'],
+      });
+
+      if (data['access_token'] != null && data['refresh_token'] != null) {
+        await TenantService.instance.setSession(
+          data['access_token'] as String,
+          data['refresh_token'] as String,
+        );
+      }
+
+      _currentUser = user;
+      await _persistUser(user);
+      return user;
+    } catch (e) {
+      // Dev-only fallback when Edge Function is unavailable locally
+      if (kDebugMode && identifier == 'demo' && credential == 'demo') {
+        return AuthUser(
+          id: 'dev-user-id',
+          stationId: 'dev-station-id',
+          stationCode: stationCode,
+          stationName: curStation?.stationName ?? 'Dev Station',
+          role: role,
+          fullName: 'Dev User',
+        );
+      }
+      rethrow;
+    }
   }
 
   /// Step 2b: Creditor login - just validates phone number, no Supabase Auth needed
@@ -223,6 +248,10 @@ class DealerSetupService {
         data['refresh_token'] as String,
       );
     }
+
+    // Persist user so the app can restore session on next launch
+    AuthService.instance._currentUser = user;
+    await AuthService.instance._persistUser(user);
 
     return user;
   }

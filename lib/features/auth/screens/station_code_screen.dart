@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../shared/widgets/widgets.dart';
 
@@ -37,6 +38,63 @@ class _StationCodeScreenState extends ConsumerState<StationCodeScreen> {
     }
   }
 
+  void _showManualConfig() {
+    final urlCtrl = TextEditingController();
+    final keyCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        title: const Text('Manual Configuration',
+            style: TextStyle(color: AppColors.textPrimary)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Enter tenant database credentials directly.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: urlCtrl,
+              style: const TextStyle(color: AppColors.textPrimary),
+              decoration: const InputDecoration(
+                labelText: 'Supabase URL',
+                labelStyle: TextStyle(color: AppColors.textMuted),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: keyCtrl,
+              style: const TextStyle(color: AppColors.textPrimary),
+              decoration: const InputDecoration(
+                labelText: 'Anon Key',
+                labelStyle: TextStyle(color: AppColors.textMuted),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              ref.read(authProvider.notifier).configureManual(
+                    url: urlCtrl.text.trim(),
+                    key: keyCtrl.text.trim(),
+                  );
+              Navigator.pop(context);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
@@ -67,7 +125,7 @@ class _StationCodeScreenState extends ConsumerState<StationCodeScreen> {
                           color: AppColors.blueBg,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                              color: AppColors.blue.withOpacity(0.3)),
+                              color: AppColors.blue.withValues(alpha: 0.3)),
                         ),
                         child: const Icon(Icons.local_gas_station,
                             color: AppColors.blue, size: 22),
@@ -90,16 +148,17 @@ class _StationCodeScreenState extends ConsumerState<StationCodeScreen> {
                     'Enter Station Code',
                     style: TextStyle(
                       color: AppColors.textPrimary,
-                      fontSize: 26,
+                      fontSize: 28,
                       fontWeight: FontWeight.w800,
                       letterSpacing: -0.5,
                     ),
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Your station code is provided by your dealer. It identifies which fuel station you belong to.',
+                    'Provide your station code to connect to your operational database.',
                     style: TextStyle(
-                        color: AppColors.textSecondary, fontSize: 14,
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
                         height: 1.5),
                   ),
                   const SizedBox(height: 32),
@@ -116,9 +175,6 @@ class _StationCodeScreenState extends ConsumerState<StationCodeScreen> {
                       if (v == null || v.trim().isEmpty) {
                         return 'Please enter your station code';
                       }
-                      if (v.trim().length < 4) {
-                        return 'Station code must be at least 4 characters';
-                      }
                       return null;
                     },
                   ),
@@ -131,7 +187,7 @@ class _StationCodeScreenState extends ConsumerState<StationCodeScreen> {
                         color: AppColors.redBg,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                            color: AppColors.red.withOpacity(0.3)),
+                            color: AppColors.red.withValues(alpha: 0.3)),
                       ),
                       child: Row(
                         children: [
@@ -152,32 +208,78 @@ class _StationCodeScreenState extends ConsumerState<StationCodeScreen> {
 
                   const SizedBox(height: 24),
                   AppButton(
-                    label: 'Continue',
+                    label: 'Connect to Station',
                     onTap: _proceed,
                     loading: auth.isLoading,
                     width: double.infinity,
                   ),
 
-                  const SizedBox(height: 24),
-                  Center(
-                    child: TextButton(
-                      onPressed: () => context.go('/signup'),
-                      child: const Text(
-                        'New dealer? Register your station →',
-                        style: TextStyle(
-                            color: AppColors.blue, fontSize: 13),
-                      ),
-                    ),
+                  const SizedBox(height: 16),
+                  AppButton(
+                    label: 'Try Demo Mode',
+                    onTap: () =>
+                        ref.read(authProvider.notifier).enterDemoMode(),
+                    secondary: true,
+                    width: double.infinity,
                   ),
 
-                  // Creditor link
+                  const SizedBox(height: 40),
+                  const Divider(color: AppColors.border),
+                  const SizedBox(height: 32),
+
+                  const Text(
+                    'First time here?',
+                    style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Register your station and setup your internal operational database.',
+                    style:
+                        TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  ),
+                  const SizedBox(height: 16),
+                  AppButton(
+                    label: 'Register New Station',
+                    onTap: () => context.go('/signup'),
+                    secondary: true,
+                    width: double.infinity,
+                  ),
+
+                  if (!AppConstants.hasRegistry) ...[
+                    const SizedBox(height: 24),
+                    const Center(
+                      child: Text(
+                        'Note: Central Registry is not configured in this build.',
+                        textAlign: TextAlign.center,
+                        style:
+                            TextStyle(color: AppColors.textMuted, fontSize: 11),
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 32),
                   Center(
                     child: TextButton(
                       onPressed: () => context.go('/creditor'),
                       child: const Text(
-                        'Check your credit account',
+                        'Access Creditor Portal →',
                         style: TextStyle(
-                            color: AppColors.textMuted, fontSize: 12),
+                            color: AppColors.textSecondary, fontSize: 13),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+                  Center(
+                    child: TextButton(
+                      onPressed: _showManualConfig,
+                      child: const Text(
+                        'Dev: Manual Configuration',
+                        style:
+                            TextStyle(color: AppColors.textMuted, fontSize: 12),
                       ),
                     ),
                   ),

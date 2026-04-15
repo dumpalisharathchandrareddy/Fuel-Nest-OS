@@ -1,4 +1,3 @@
-// ─── role_select_screen.dart ──────────────────────────────────────────────────
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,171 +5,8 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../shared/widgets/widgets.dart';
 
-class RoleSelectScreen extends ConsumerWidget {
-  const RoleSelectScreen({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final auth = ref.watch(authProvider);
-    final size = MediaQuery.sizeOf(context);
-    final isWide = size.width > 600;
-
-    return Scaffold(
-      backgroundColor: AppColors.bgApp,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(
-              horizontal: isWide ? size.width * 0.25 : 24,
-              vertical: 32,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Back + station info
-                GestureDetector(
-                  onTap: () {
-                    ref.read(authProvider.notifier).clearStation();
-                    context.go('/station');
-                  },
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.arrow_back_ios,
-                          size: 14, color: AppColors.textMuted),
-                      const SizedBox(width: 4),
-                      Text(
-                        auth.stationCode ?? '',
-                        style: const TextStyle(
-                            color: AppColors.textMuted, fontSize: 13),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                Text(
-                  auth.stationName ?? 'Select Role',
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Choose how you want to sign in',
-                  style: TextStyle(
-                      color: AppColors.textSecondary, fontSize: 14),
-                ),
-                const SizedBox(height: 32),
-
-                _RoleCard(
-                  title: 'Dealer',
-                  subtitle: 'Full access — settings, reports, all data',
-                  icon: Icons.admin_panel_settings_outlined,
-                  color: AppColors.amber,
-                  onTap: () => context.go('/login/dealer'),
-                ),
-                const SizedBox(height: 12),
-                _RoleCard(
-                  title: 'Manager',
-                  subtitle: 'Daily operations — shifts, payroll, inventory',
-                  icon: Icons.manage_accounts_outlined,
-                  color: AppColors.blue,
-                  onTap: () => context.go('/login/manager'),
-                ),
-                const SizedBox(height: 12),
-                _RoleCard(
-                  title: 'Staff',
-                  subtitle: 'Pump entry — nozzle readings, shift execution',
-                  icon: Icons.local_gas_station_outlined,
-                  color: AppColors.green,
-                  onTap: () => context.go('/login/staff'),
-                ),
-                const SizedBox(height: 12),
-                _RoleCard(
-                  title: 'Credit Customer',
-                  subtitle: 'Check your credit balance and transactions',
-                  icon: Icons.credit_card_outlined,
-                  color: AppColors.purple,
-                  onTap: () => context.go('/creditor'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RoleCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _RoleCard({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      onTap: onTap,
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 22),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                      color: AppColors.textSecondary, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          const Icon(Icons.chevron_right,
-              color: AppColors.textMuted, size: 20),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── login_screen.dart ────────────────────────────────────────────────────────
-
 class LoginScreen extends ConsumerStatefulWidget {
-  final String role;
-  const LoginScreen({super.key, required this.role});
+  const LoginScreen({super.key});
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -178,38 +14,25 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _form = GlobalKey<FormState>();
-  final _identifierCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
   final _credentialCtrl = TextEditingController();
-  bool _usePin = false;
+  bool _usePin = true;
 
   @override
   void dispose() {
-    _identifierCtrl.dispose();
+    _phoneCtrl.dispose();
     _credentialCtrl.dispose();
     super.dispose();
   }
-
-  String get _title => switch (widget.role) {
-    'DEALER' => 'Dealer Login',
-    'MANAGER' => 'Manager Login',
-    _ => 'Staff Login',
-  };
-
-  String get _identifierLabel => switch (widget.role) {
-    'PUMP_PERSON' => 'Employee ID',
-    _ => 'Username',
-  };
 
   Future<void> _login() async {
     if (!_form.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
 
     final success = await ref.read(authProvider.notifier).login(
-      identifier: _identifierCtrl.text.trim(),
-      credential: _credentialCtrl.text.trim(),
-      role: widget.role,
-      isPin: _usePin,
-    );
+          identifier: _phoneCtrl.text.trim(),
+          credential: _credentialCtrl.text.trim(),
+        );
 
     if (success && mounted) {
       final user = ref.read(authProvider).user!;
@@ -227,12 +50,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final size = MediaQuery.sizeOf(context);
     final isWide = size.width > 600;
 
-    final color = switch (widget.role) {
-      'DEALER' => AppColors.amber,
-      'MANAGER' => AppColors.blue,
-      _ => AppColors.green,
-    };
-
     return Scaffold(
       backgroundColor: AppColors.bgApp,
       body: SafeArea(
@@ -247,16 +64,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Back
+                  // Back to station code
                   GestureDetector(
-                    onTap: () => context.go('/login'),
+                    onTap: () {
+                      ref.read(authProvider.notifier).clearStation();
+                      context.go('/station');
+                    },
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.arrow_back_ios,
                             size: 14, color: AppColors.textMuted),
                         SizedBox(width: 4),
-                        Text('Back',
+                        Text('Switch Station',
                             style: TextStyle(
                                 color: AppColors.textMuted, fontSize: 13)),
                       ],
@@ -264,78 +84,78 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 32),
 
-                  // Role icon
+                  // App Logo/Icon
                   Container(
                     width: 52,
                     height: 52,
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.12),
+                      color: AppColors.blueBg,
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: Icon(Icons.person_outline, color: color, size: 26),
+                    child: const Icon(Icons.login_rounded,
+                        color: AppColors.blue, size: 26),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
 
-                  Text(
-                    _title,
-                    style: const TextStyle(
+                  const Text(
+                    'Sign In',
+                    style: TextStyle(
                       color: AppColors.textPrimary,
-                      fontSize: 26,
+                      fontSize: 32,
                       fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
+                      letterSpacing: -1.0,
                     ),
                   ),
                   Text(
-                    auth.stationName ?? '',
+                    auth.stationName ?? 'Connect to your station',
                     style: const TextStyle(
-                        color: AppColors.textSecondary, fontSize: 14),
+                        color: AppColors.textSecondary, fontSize: 15),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 40),
 
-                  // Identifier
+                  // Phone number
                   AppTextField(
-                    label: _identifierLabel,
-                    hint: widget.role == 'PUMP_PERSON'
-                        ? 'Your employee ID'
-                        : 'Your username',
-                    controller: _identifierCtrl,
-                    prefixIcon: Icons.person_outline,
+                    label: 'Mobile Number',
+                    hint: 'Enter your registered phone',
+                    controller: _phoneCtrl,
+                    prefixIcon: Icons.phone_android_outlined,
+                    keyboardType: TextInputType.phone,
                     textInputAction: TextInputAction.next,
-                    validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'Required' : null,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'Required';
+                      if (v.trim().length < 10) return 'Enter valid phone';
+                      return null;
+                    },
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
 
-                  // Toggle PIN / Password
+                  // Credential field (PIN or Password)
                   Row(
                     children: [
-                      const Expanded(
-                        child: Text('Sign in with',
-                            style: TextStyle(
-                                color: AppColors.textMuted, fontSize: 12)),
+                      Expanded(
+                        child: Text(_usePin ? 'PIN' : 'Password',
+                            style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600)),
                       ),
                       GestureDetector(
                         onTap: () => setState(() => _usePin = !_usePin),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _usePin ? 'Password' : 'PIN',
-                              style: const TextStyle(
-                                  color: AppColors.blue, fontSize: 12),
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(Icons.swap_horiz,
-                                size: 14, color: AppColors.blue),
-                          ],
+                        child: Text(
+                          _usePin ? 'Use Password' : 'Use PIN',
+                          style: const TextStyle(
+                              color: AppColors.blue,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   AppTextField(
-                    label: _usePin ? 'PIN' : 'Password',
-                    hint: _usePin ? '4–6 digit PIN' : 'Your password',
+                    label: '', // label already handled above
+                    hint:
+                        _usePin ? 'Enter 4-6 digit PIN' : 'Enter your password',
                     controller: _credentialCtrl,
                     obscure: true,
                     keyboardType: _usePin
@@ -346,18 +166,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _login(),
                     validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'Required' : null,
+                        v == null || v.isEmpty ? 'Required' : null,
                   ),
 
                   if (auth.error != null) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: AppColors.redBg,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                            color: AppColors.red.withOpacity(0.3)),
+                            color: AppColors.red.withValues(alpha: 0.2)),
                       ),
                       child: Row(
                         children: [
@@ -376,12 +196,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ],
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
                   AppButton(
                     label: 'Sign In',
                     onTap: _login,
                     loading: auth.isLoading,
                     width: double.infinity,
+                  ),
+
+                  const SizedBox(height: 24),
+                  Center(
+                    child: Text(
+                      'Station Code: ${auth.stationCode}',
+                      style: const TextStyle(
+                          color: AppColors.textMuted, fontSize: 12),
+                    ),
                   ),
                 ],
               ),

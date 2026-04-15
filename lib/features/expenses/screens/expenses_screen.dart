@@ -202,7 +202,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                                     horizontal: 10, vertical: 7),
                                 decoration: BoxDecoration(
                                     color: sel
-                                        ? color.withOpacity(0.15)
+                                        ? color.withValues(alpha: 0.15)
                                         : AppColors.bgCard,
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
@@ -381,8 +381,9 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                     ]),
               )),
     );
-    for (final c in [nameCtrl, amtCtrl, descCtrl, vendorCtrl, customCatCtrl])
+    for (final c in [nameCtrl, amtCtrl, descCtrl, vendorCtrl, customCatCtrl]) {
       c.dispose();
+    }
   }
 
   Future<void> _deleteExpense(String id) async {
@@ -400,9 +401,10 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
       }).eq('id', id);
       _fetch();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
   }
 
@@ -621,13 +623,13 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Padding(
-                                            padding: const EdgeInsets.only(
+                                            padding: EdgeInsets.only(
                                                 bottom: 8,
                                                 top: gi == 0 ? 0 : 16),
                                             child: Row(children: [
                                               Text(
                                                   IstTime.formatDate(
-                                                      DateTime.parse(groupDate +
+                                                      DateTime.parse('$groupDate'
                                                           'T00:00:00.000Z')),
                                                   style: const TextStyle(
                                                       color: AppColors
@@ -668,7 +670,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                                                     height: 38,
                                                     decoration: BoxDecoration(
                                                         color: catData.$4
-                                                            .withOpacity(0.12),
+                                                            .withValues(alpha: 0.12),
                                                         borderRadius:
                                                             BorderRadius
                                                                 .circular(10)),
@@ -817,17 +819,17 @@ class _SumCell2 extends StatelessWidget {
 }
 
 class _CatChip extends StatelessWidget {
-  final String key;
+  final String catKey;
   final String label;
   final IconData icon;
   final String selected;
   final void Function(String) onTap;
-  const _CatChip(this.key, this.label, this.icon, this.selected, this.onTap);
+  const _CatChip(this.catKey, this.label, this.icon, this.selected, this.onTap);
   @override
   Widget build(BuildContext context) {
-    final sel = selected == key;
+    final sel = selected == catKey;
     return GestureDetector(
-        onTap: () => onTap(key),
+        onTap: () => onTap(catKey),
         child: Container(
             margin: const EdgeInsets.only(right: 6),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

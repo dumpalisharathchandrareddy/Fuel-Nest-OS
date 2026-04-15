@@ -17,9 +17,8 @@ class IndianCurrency {
     decimalDigits: 0,
   );
 
-  static final _litreFmt = NumberFormat('#,##0.00', 'en_IN');
+  static final _litresFmt = NumberFormat('#,##,##0.00', 'en_IN');
   static final _numberFmt = NumberFormat('#,##,##0', 'en_IN');
-  static final _compactFmt = NumberFormat.compact(locale: 'en_IN');
 
   /// "₹1,23,456.78"
   static String format(num amount) => _currencyFmt.format(amount);
@@ -42,7 +41,7 @@ class IndianCurrency {
   }
 
   /// "1,234.56 L" for fuel litres
-  static String formatLitres(num litres) => '${_litreFmt.format(litres)} L';
+  static String formatLitres(num litres) => '${_litresFmt.format(litres)} L';
 
   /// "1,23,456" for number (Indian format)
   static String formatNumber(num n) => _numberFmt.format(n);

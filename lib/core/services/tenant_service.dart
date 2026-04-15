@@ -52,6 +52,20 @@ class TenantService {
     _tenantClient = SupabaseClient(entry.supabaseUrl, entry.anonKey);
   }
 
+  /// Configure with dummy credentials for UI testing/Demo Mode.
+  void configureDemoMode() {
+    _currentStation = const StationRegistryEntry(
+      stationCode: 'DEMO001',
+      stationName: 'FuelOS Demo Station',
+      supabaseUrl: 'https://demo.supabase.co',
+      anonKey: 'demo-anon-key',
+    );
+    _tenantClient = SupabaseClient(
+      _currentStation!.supabaseUrl,
+      _currentStation!.anonKey,
+    );
+  }
+
   /// Restore tenant connection from secure storage on app launch.
   /// Returns the stored station code if found.
   Future<String?> restoreFromStorage() async {
@@ -88,7 +102,8 @@ class TenantService {
     final parts = saved.split('|');
     if (parts.length < 2) return false;
     try {
-      await client.auth.setSession(parts[0]);
+      // Add a timeout to prevent hanging on splash screen if URL is dead
+      await client.auth.setSession(parts[0]).timeout(const Duration(seconds: 8));
       return true;
     } catch (_) {
       return false;

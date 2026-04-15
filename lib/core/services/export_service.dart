@@ -43,19 +43,18 @@ class ExportService {
               ['Status', shiftData['status']?.toString() ?? ''],
               [
                 'Sale Amount',
-                IndianCurrency.format(
-                  double.tryParse(((shiftData['nozzle_entries'] as List? ?? [])
-                              .fold<double>(
-                                  0,
-                                  (s, e) =>
-                                      s +
-                                      (double.tryParse((e as Map)['sale_amount']
-                                                  ?.toString() ??
-                                              '0') ??
-                                          0))).toString() ??
-                          '0') ??
-                      0,
-                ),
+                         IndianCurrency.format(
+                          double.tryParse(((shiftData['nozzle_entries'] as List? ?? [])
+                                      .fold<double>(
+                                          0,
+                                          (s, e) =>
+                                              s +
+                                              (double.tryParse((e as Map)['sale_amount']
+                                                          ?.toString() ??
+                                                      '0') ??
+                                                  0))).toString()) ??
+                              0,
+                        ),
               ],
               ['Opened', shiftData['opened_at']?.toString() ?? ''],
               ['Closed', shiftData['closed_at']?.toString() ?? 'Open'],
@@ -67,11 +66,11 @@ class ExportService {
               title: 'Nozzle Readings',
               headers: ['Nozzle', 'Fuel', 'Opening', 'Closing', 'Volume'],
               rows: (shiftData['nozzle_entries'] as List<dynamic>)
-                  .map((e) => [
-                        e['nozzle_label'] ??
+                  .map((e) => <String>[
+                        e['nozzle_label']?.toString() ??
                             (e['nozzle'] as Map?)?['label']?.toString() ??
                             '',
-                        e['fuel_type'] ??
+                        e['fuel_type']?.toString() ??
                             (e['nozzle'] as Map?)?['fuel_type']?.toString() ??
                             '',
                         e['opening_reading']?.toString() ?? '',
@@ -141,9 +140,8 @@ class ExportService {
               final cap =
                   double.tryParse(t['capacity_liters']?.toString() ?? '0') ?? 0;
               final cur = double.tryParse(
-                      0.0 /* no current_stock - use StockTransaction */
-                              .toString() ??
-                          '0') ??
+                      (0.0 /* no current_stock - use StockTransaction */)
+                               .toString()) ??
                   0;
               final pct = cap > 0 ? (cur / cap * 100).round() : 0;
               return [
@@ -212,28 +210,21 @@ class ExportService {
             title: 'Salary Payouts',
             headers: ['Staff', 'Base', 'Advances', 'Bonus', 'Penalty', 'Net'],
             rows: payouts
-                .map((p) => [
-                      p['staff_name'] ??
+                .map((p) => <String>[
+                      p['staff_name']?.toString() ??
                           (p['user'] as Map?)?['full_name']?.toString() ??
                           '',
                       IndianCurrency.format(double.tryParse(
-                              p['base_salary_snapshot'] ??
-                                  p['base_salary_snapshot']?.toString() ??
-                                  '0') ??
+                              p['base_salary_snapshot']?.toString() ?? '0') ??
                           0),
                       IndianCurrency.format(
                           double.tryParse(p['advances']?.toString() ?? '0') ??
                               0),
-                      IndianCurrency.format(double.tryParse(p['incentives'] ??
-                              p['incentives'] ??
-                              0.toString() ??
-                              '0') ??
-                          0),
+                      IndianCurrency.format(
+                          double.tryParse(p['incentives']?.toString() ?? '0') ??
+                              0),
                       IndianCurrency.format(double.tryParse(
-                              p['other_deductions'] ??
-                                  p['other_deductions'] ??
-                                  0.toString() ??
-                                  '0') ??
+                              p['other_deductions']?.toString() ?? '0') ??
                           0),
                       IndianCurrency.format(
                           double.tryParse(p['net_paid']?.toString() ?? '0') ??
@@ -326,7 +317,7 @@ class ExportService {
               children: [
                 pw.Text(
                   AppConstants.appName,
-                  style: pw.TextStyle(
+                  style: const pw.TextStyle(
                     fontSize: 10,
                     color: PdfColors.grey600,
                     letterSpacing: 2,
@@ -343,7 +334,7 @@ class ExportService {
                 ),
                 pw.Text(
                   subtitle,
-                  style: pw.TextStyle(
+                  style: const pw.TextStyle(
                     fontSize: 12,
                     color: PdfColors.grey700,
                   ),
@@ -355,7 +346,7 @@ class ExportService {
               children: [
                 pw.Text(
                   'Generated',
-                  style: pw.TextStyle(fontSize: 9, color: PdfColors.grey500),
+                  style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey500),
                 ),
                 pw.Text(
                   generatedAt,

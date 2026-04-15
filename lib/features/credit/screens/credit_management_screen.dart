@@ -7,7 +7,6 @@ import '../../../core/providers/auth_provider.dart';
 import '../../../core/services/tenant_service.dart';
 import '../../../core/utils/ist_time.dart';
 import '../../../core/utils/currency.dart';
-import '../../../core/utils/validators.dart';
 import '../../../shared/widgets/widgets.dart';
 
 class CreditManagementScreen extends ConsumerStatefulWidget {
@@ -103,6 +102,7 @@ class _CreditManagementScreenState
     });
     try {
       final db = TenantService.instance.client;
+      final user = ref.read(currentUserProvider)!;
       final cid = customer['id'] as String;
       final results = await Future.wait([
         // CreditTransaction: amount, liters (NOT litres), date (NOT transaction_date)
@@ -773,7 +773,6 @@ class _CreditManagementScreenState
         .replaceAll(RegExp(r'\D'), '');
     final msg =
         'Dear $name,\n\nYou have an outstanding credit balance of ${IndianCurrency.format(outstanding)} at *$stationName*.\n\nPlease clear at your earliest convenience. Thank you!\n\n_Sent via FuelOS_';
-    final url = Uri.encodeFull('https://wa.me/91$phone?text=$msg');
     Share.share(msg);
   }
 
@@ -896,9 +895,9 @@ class _CreditManagementScreenState
                           }
                         },
                         borderColor: isOver
-                            ? AppColors.red.withOpacity(0.3)
+                            ? AppColors.red.withValues(alpha: 0.3)
                             : (outstanding > 0
-                                ? AppColors.amber.withOpacity(0.2)
+                                ? AppColors.amber.withValues(alpha: 0.2)
                                 : null),
                         child: Row(children: [
                           Container(

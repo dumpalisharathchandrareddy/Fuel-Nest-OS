@@ -35,7 +35,12 @@ class _WorkerHomeScreenState extends ConsumerState<WorkerHomeScreen> {
     });
     try {
       final db = TenantService.instance.client;
-      final user = ref.read(currentUserProvider)!;
+      final user = ref.read(currentUserProvider);
+
+      if (user == null) {
+        setState(() => _loading = false);
+        return;
+      }
 
       final pumps = await db
           .from('Pump')
@@ -127,7 +132,8 @@ class _WorkerHomeScreenState extends ConsumerState<WorkerHomeScreen> {
                                 color: AppColors.greenBg,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                    color: AppColors.green.withOpacity(0.3)),
+                                    color:
+                                        AppColors.green.withValues(alpha: 0.3)),
                               ),
                               child: Row(
                                 children: [
@@ -173,12 +179,12 @@ class _WorkerHomeScreenState extends ConsumerState<WorkerHomeScreen> {
                         ),
 
                       // Date + greeting
-                      SliverToBoxAdapter(
+                      const SliverToBoxAdapter(
                         child: Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+                          padding: EdgeInsets.fromLTRB(20, 4, 20, 16),
                           child: Text(
                             'Select Pump to Start Entry',
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 13,
                             ),
@@ -301,7 +307,9 @@ class _NozzleEntryScreenState extends ConsumerState<NozzleEntryScreen> {
 
   @override
   void dispose() {
-    for (final c in _controllers.values) c.dispose();
+    for (final c in _controllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -312,7 +320,12 @@ class _NozzleEntryScreenState extends ConsumerState<NozzleEntryScreen> {
     });
     try {
       final db = TenantService.instance.client;
-      final user = ref.read(currentUserProvider)!;
+      final user = ref.read(currentUserProvider);
+
+      if (user == null) {
+        setState(() => _loading = false);
+        return;
+      }
 
       // Get active shift for this pump or create one
       final shifts = await db
@@ -334,7 +347,7 @@ class _NozzleEntryScreenState extends ConsumerState<NozzleEntryScreen> {
         return;
       }
 
-      final shift = shifts.first as Map<String, dynamic>;
+      final shift = shifts.first;
       final entries = shift['nozzle_entries'] as List? ?? [];
 
       final readings = entries.map<Map<String, dynamic>>((e) {
@@ -501,7 +514,8 @@ class _NozzleEntryScreenState extends ConsumerState<NozzleEntryScreen> {
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 8, vertical: 4),
                                           decoration: BoxDecoration(
-                                            color: fuelColor.withOpacity(0.12),
+                                            color: fuelColor.withValues(
+                                                alpha: 0.12),
                                             borderRadius:
                                                 BorderRadius.circular(6),
                                           ),
@@ -703,7 +717,7 @@ class _ShiftExecutionScreenState extends ConsumerState<ShiftExecutionScreen> {
   bool _loading = true;
   String? _error;
   Map<String, dynamic>? _shift;
-  bool _closing = false;
+  final bool _closing = false;
 
   @override
   void initState() {
@@ -742,9 +756,10 @@ class _ShiftExecutionScreenState extends ConsumerState<ShiftExecutionScreen> {
     final allFilled =
         entries.every((e) => (e as Map)['closing_reading'] != null);
     if (!allFilled) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Enter all closing readings first')));
+      }
       return;
     }
     context.go('/worker/nozzle/${_shift!['pump']['id'] ?? ''}');
@@ -752,13 +767,15 @@ class _ShiftExecutionScreenState extends ConsumerState<ShiftExecutionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading)
+    if (_loading) {
       return const Scaffold(
           backgroundColor: AppColors.bgApp, body: LoadingView());
-    if (_error != null)
+    }
+    if (_error != null) {
       return Scaffold(
           backgroundColor: AppColors.bgApp,
           body: ErrorView(message: _error!, onRetry: _fetch));
+    }
 
     final entries = _shift!['nozzle_entries'] as List? ?? [];
     // Shift has no sale_amount column — compute from nozzle entries
@@ -842,15 +859,16 @@ class _ShiftExecutionScreenState extends ConsumerState<ShiftExecutionScreen> {
                 return Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: AppCard(
-                      borderColor:
-                          hasReading ? AppColors.green.withOpacity(0.2) : null,
+                      borderColor: hasReading
+                          ? AppColors.green.withValues(alpha: 0.2)
+                          : null,
                       child: Column(children: [
                         Row(children: [
                           Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                  color: fuelColor.withOpacity(0.12),
+                                  color: fuelColor.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(6)),
                               child: Text(fuel,
                                   style: TextStyle(
@@ -988,7 +1006,12 @@ class _MyEarningsScreenState extends ConsumerState<MyEarningsScreen> {
     });
     try {
       final db = TenantService.instance.client;
-      final user = ref.read(currentUserProvider)!;
+      final user = ref.read(currentUserProvider);
+
+      if (user == null) {
+        setState(() => _loading = false);
+        return;
+      }
 
       final results = await Future.wait([
         db
@@ -1079,14 +1102,14 @@ class _MyEarningsScreenState extends ConsumerState<MyEarningsScreen> {
                                 ],
                               ),
                               const SizedBox(height: 8),
-                              Row(
+                              const Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text('Type',
+                                  Text('Type',
                                       style: TextStyle(
                                           color: AppColors.textSecondary)),
-                                  const StatusBadge(
+                                  StatusBadge(
                                     label: 'Monthly',
                                     tone: BadgeTone.info,
                                   ),

@@ -23,60 +23,104 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _fetch();
+    Future.microtask(_fetch);
   }
 
   Future<void> _fetch() async {
+    if (!mounted) return;
+    debugPrint('Dashboard: [_fetch] starting...');
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final db = TenantService.instance.client;
-      final user = ref.read(currentUserProvider)!;
+      final auth = ref.read(authProvider);
+      debugPrint('Dashboard: [_fetch] isDemoMode = ${auth.isDemoMode}');
 
-      // Parallel fetches matching existing /manager/overview endpoint logic
+      if (auth.isDemoMode) {
+        debugPrint('Dashboard: [_fetch] entering Demo Mode mock branch');
+        // Small delay to let UI settle
+        await Future.delayed(const Duration(milliseconds: 100));
+
+        if (!mounted) return;
+        setState(() {
+          _data = {
+            'activeShifts': [
+              {
+                'id': 'demo-shift-1',
+                'status': 'OPEN',
+                'pump': {'name': 'Pump 1 (Petrol)'},
+                'assigned_worker': {'full_name': 'Demo Worker'},
+                'nozzle_entries': [{'sale_amount': 5000.0}]
+              },
+            ],
+            'pendingSettlements': 2,
+            'lowStockAlerts': 0,
+            'totalCreditsPending': 5,
+            'todayRevenue': 12450.0,
+            'tanks': [
+              {
+                'id': 't1', 'name': 'Main Petrol', 'fuel_type': 'Petrol',
+                'capacity_liters': 20000.0, 'current_stock': 12000.0,
+                'low_stock_threshold': 5000.0,
+              },
+            ],
+            'lowTanks': [],
+            'staff': [],
+            'pumps': [],
+            'managers': 1,
+            'workers': 4,
+          };
+          _loading = false;
+        });
+        debugPrint('Dashboard: [_fetch] Demo Mode data applied.');
+        return;
+      }
+
+      debugPrint('Dashboard: [_fetch] calling Supabase...');
+      final db = TenantService.instance.client;
+      final user = ref.read(currentUserProvider);
+      
+      if (user == null) {
+        debugPrint('Dashboard: [_fetch] User is null, skipping fetch.');
+        setState(() => _loading = false);
+        return;
+      }
+
       final results = await Future.wait([
-        // Active shifts
         db
             .from('Shift')
             .select(
                 'id, status, sale_amount, pump:Pump(name), assigned_worker:User(full_name)')
             .eq('station_id', user.stationId)
             .eq('status', 'OPEN'),
-        // Pending settlements
         db
             .from('Shift')
             .select('id')
             .eq('station_id', user.stationId)
             .eq('status', 'CLOSED'),
-        // Low stock tanks
         db
             .from('Tank')
-            .select('id, name, fuel_type, capacity_liters, low_stock_threshold')
+            .select('id, name, fuel_type, capacity_liters, current_stock, low_stock_threshold')
             .eq('station_id', user.stationId)
             .eq('active', true),
-        // Total pending credits
         db
             .from('CreditCustomer')
             .select('id')
             .eq('station_id', user.stationId)
             .eq('active', true),
-        // Today's revenue (shifts closed today)
         db
             .from('Shift')
             .select('nozzle_entries:NozzleEntry(sale_amount)')
             .eq('station_id', user.stationId)
             .eq('status', 'SETTLED')
             .gte('closed_at', '${IstTime.todayDate()}T00:00:00+05:30'),
-        // Staff counts
         db
             .from('User')
             .select('id, role')
             .eq('station_id', user.stationId)
             .eq('active', true)
             .neq('role', 'DEALER'),
-        // Pumps
         db
             .from('Pump')
             .select('id, name, provider_type, active')
@@ -107,10 +151,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       final lowTanks = tanks.where((t) {
         final cap =
             double.tryParse(t['capacity_liters']?.toString() ?? '0') ?? 0;
-        final cur = double.tryParse(
-                0.0 /* stock computed from StockTransaction */ .toString() ??
-                    '0') ??
-            0;
+        final cur = double.tryParse(t['current_stock']?.toString() ?? '0') ?? 0;
         final reorder =
             double.tryParse(t['low_stock_threshold']?.toString() ?? '0') ?? 0;
         return reorder > 0 && cur <= reorder;
@@ -156,7 +197,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       onRefresh: _fetch,
       child: CustomScrollView(
         slivers: [
-          // Header
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -200,7 +240,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Alert banners
                   if ((d['lowStockAlerts'] as int) > 0)
                     _AlertBanner(
                       message:
@@ -220,7 +259,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
           ),
 
-          // KPI Grid
           SliverPadding(
             padding: const EdgeInsets.all(20),
             sliver: SliverGrid(
@@ -228,7 +266,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 crossAxisCount: MediaQuery.sizeOf(context).width > 600 ? 4 : 2,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                childAspectRatio: 1.4,
+                childAspectRatio: MediaQuery.sizeOf(context).width < 380 ? 1.1 : 1.35,
               ),
               delegate: SliverChildListDelegate([
                 KpiCard.currency(
@@ -256,7 +294,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   label: 'Low Stock Alerts',
                   value: '${d['lowStockAlerts']}',
                   icon: Icons.warning_amber_outlined,
-                  color: d['lowStockAlerts'] > 0
+                  color: (d['lowStockAlerts'] as int) > 0
                       ? AppColors.red
                       : AppColors.textMuted,
                   onTap: () => context.go('/app/inventory'),
@@ -265,7 +303,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
           ),
 
-          // Active pumps
           if (activeShifts.isNotEmpty)
             SliverToBoxAdapter(
               child: Padding(
@@ -288,7 +325,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ),
             ),
 
-          // Tank status
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -312,7 +348,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
           ),
 
-          // Staff summary
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
@@ -369,9 +404,9 @@ class _AlertBanner extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
+          color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [
@@ -408,7 +443,7 @@ class _ActiveShiftCard extends StatelessWidget {
                 0));
 
     return AppCard(
-      borderColor: AppColors.green.withOpacity(0.2),
+      borderColor: AppColors.green.withValues(alpha: 0.2),
       child: Row(
         children: [
           Container(
@@ -455,10 +490,7 @@ class _TankCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cap =
         double.tryParse(tank['capacity_liters']?.toString() ?? '0') ?? 0;
-    final cur = double.tryParse(
-            tank['capacity_liters' /* was current_stock */]?.toString() ??
-                '0') ??
-        0;
+    final cur = double.tryParse(tank['current_stock']?.toString() ?? '0') ?? 0;
     final pct = cap > 0 ? (cur / cap).clamp(0.0, 1.0) : 0.0;
     final isLow = pct < 0.2;
 

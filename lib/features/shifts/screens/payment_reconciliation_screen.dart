@@ -60,7 +60,9 @@ class _PaymentReconciliationScreenState
       if (pr != null) {
         final prId = pr['id'] as String;
         _amountControllers[prId] = TextEditingController(
-          text: (pr['actual_cash_collected_amount'] ?? pr['cash_to_collect'])?.toString() ?? '0',
+          text: (pr['actual_cash_collected_amount'] ?? pr['cash_to_collect'])
+                  ?.toString() ??
+              '0',
         );
       }
 
@@ -79,10 +81,15 @@ class _PaymentReconciliationScreenState
 
   double get _totalSale {
     final pr = _shift?['payment_record'] as Map?;
-    if (pr != null) return double.tryParse(pr['total_sale_amount']?.toString() ?? '0') ?? 0;
+    if (pr != null)
+      return double.tryParse(pr['total_sale_amount']?.toString() ?? '0') ?? 0;
     // Fallback: sum nozzle entries
     return (_shift?['nozzle_entries'] as List? ?? []).fold<double>(
-        0, (s, e) => s + (double.tryParse((e as Map)['sale_amount']?.toString() ?? '0') ?? 0));
+        0,
+        (s, e) =>
+            s +
+            (double.tryParse((e as Map)['sale_amount']?.toString() ?? '0') ??
+                0));
   }
 
   double get _totalCollected => _amountControllers.values
@@ -110,9 +117,10 @@ class _PaymentReconciliationScreenState
       // Update payment records
       for (final p in _paymentRecords) {
         final key = p['id'] as String;
-        final amount = double.tryParse(_amountControllers[key]?.text ?? '0') ?? 0;
+        final amount =
+            double.tryParse(_amountControllers[key]?.text ?? '0') ?? 0;
         // PaymentRecord settlement: mark as balanced
-          // (actual update logic depends on which payment type)
+        // (actual update logic depends on which payment type)
       }
 
       // Close the shift
@@ -127,8 +135,9 @@ class _PaymentReconciliationScreenState
         pumpName:
             (_shift!['pump'] as Map?)?['name'] as String? ?? 'Unknown Pump',
         saleAmount: _totalSale,
-        workerName: (_shift!['assigned_worker'] as Map?)?['full_name'] as String? ??
-            'Unknown',
+        workerName:
+            (_shift!['assigned_worker'] as Map?)?['full_name'] as String? ??
+                'Unknown',
         stationName: stationName,
       );
 
@@ -204,12 +213,12 @@ class _PaymentReconciliationScreenState
                 const SectionHeader(title: 'Nozzle Summary'),
                 const SizedBox(height: 12),
                 ...(_shift!['nozzle_entries'] as List? ?? []).map((e) {
-                  final opening =
-                      double.tryParse(e['opening_reading']?.toString() ?? '0') ??
-                          0;
-                  final closing =
-                      double.tryParse(e['closing_reading']?.toString() ?? '0') ??
-                          0;
+                  final opening = double.tryParse(
+                          e['opening_reading']?.toString() ?? '0') ??
+                      0;
+                  final closing = double.tryParse(
+                          e['closing_reading']?.toString() ?? '0') ??
+                      0;
                   final vol = (closing - opening).clamp(0, double.infinity);
                   final nozzle = e['nozzle'] as Map? ?? {};
                   return Padding(
@@ -227,7 +236,8 @@ class _PaymentReconciliationScreenState
                                         fontWeight: FontWeight.w600)),
                                 Text(nozzle['fuel_type'] as String? ?? '',
                                     style: const TextStyle(
-                                        color: AppColors.textMuted, fontSize: 12)),
+                                        color: AppColors.textMuted,
+                                        fontSize: 12)),
                               ],
                             ),
                           ),
@@ -273,16 +283,16 @@ class _PaymentReconciliationScreenState
                                 color: AppColors.textPrimary, fontSize: 14),
                             decoration: InputDecoration(
                               prefixText: '₹ ',
-                              prefixStyle: const TextStyle(
-                                  color: AppColors.textMuted),
+                              prefixStyle:
+                                  const TextStyle(color: AppColors.textMuted),
                               border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(8),
-                                  borderSide:
-                                      const BorderSide(color: AppColors.border)),
+                                  borderSide: const BorderSide(
+                                      color: AppColors.border)),
                               enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(8),
-                                  borderSide:
-                                      const BorderSide(color: AppColors.border)),
+                                  borderSide: const BorderSide(
+                                      color: AppColors.border)),
                               focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(8),
                                   borderSide: const BorderSide(
@@ -303,12 +313,11 @@ class _PaymentReconciliationScreenState
                 const SizedBox(height: 8),
                 AppCard(
                   borderColor: _difference.abs() < 1
-                      ? AppColors.green.withOpacity(0.3)
-                      : AppColors.amber.withOpacity(0.3),
+                      ? AppColors.green.withValues(alpha: 0.3)
+                      : AppColors.amber.withValues(alpha: 0.3),
                   child: Column(
                     children: [
-                      _InfoRow('Total Sale',
-                          IndianCurrency.format(_totalSale)),
+                      _InfoRow('Total Sale', IndianCurrency.format(_totalSale)),
                       _InfoRow('Total Collected',
                           IndianCurrency.format(_totalCollected)),
                       const Divider(color: AppColors.border, height: 16),
@@ -337,14 +346,12 @@ class _PaymentReconciliationScreenState
               ],
             ),
           ),
-
           if (!isSettled)
             Container(
               padding: const EdgeInsets.all(20),
               decoration: const BoxDecoration(
                 color: AppColors.bgSurface,
-                border:
-                    Border(top: BorderSide(color: AppColors.border)),
+                border: Border(top: BorderSide(color: AppColors.border)),
               ),
               child: AppButton(
                 label: 'Settle Shift',
@@ -385,4 +392,9 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-double _d(dynamic v) { if (v == null) return 0.0; if (v is double) return v; if (v is int) return v.toDouble(); return double.tryParse(v.toString()) ?? 0.0; }
+double _d(dynamic v) {
+  if (v == null) return 0.0;
+  if (v is double) return v;
+  if (v is int) return v.toDouble();
+  return double.tryParse(v.toString()) ?? 0.0;
+}

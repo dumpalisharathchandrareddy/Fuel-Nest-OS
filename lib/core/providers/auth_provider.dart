@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/auth_user.dart';
 import '../services/auth_service.dart';
+import '../services/tenant_service.dart';
 
 // ── Auth State ────────────────────────────────────────────────────────────────
 
@@ -11,6 +12,7 @@ class AuthState {
   final String? stationCode;
   final String? stationName;
   final bool stationConfigured;
+  final bool isDemoMode;
 
   const AuthState({
     this.user,
@@ -19,6 +21,7 @@ class AuthState {
     this.stationCode,
     this.stationName,
     this.stationConfigured = false,
+    this.isDemoMode = false,
   });
 
   bool get isLoggedIn => user != null;
@@ -33,6 +36,7 @@ class AuthState {
     String? stationCode,
     String? stationName,
     bool? stationConfigured,
+    bool? isDemoMode,
   }) =>
       AuthState(
         user: user ?? this.user,
@@ -41,6 +45,7 @@ class AuthState {
         stationCode: stationCode ?? this.stationCode,
         stationName: stationName ?? this.stationName,
         stationConfigured: stationConfigured ?? this.stationConfigured,
+        isDemoMode: isDemoMode ?? this.isDemoMode,
       );
 
   AuthState withError(String e) => copyWith(isLoading: false, error: e);
@@ -63,6 +68,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           stationCode: user.stationCode,
           stationName: user.stationName,
           stationConfigured: true,
+          isDemoMode: user.id == 'demo-user-id',
         );
       } else {
         state = const AuthState();
@@ -88,7 +94,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Step 2: Login as Dealer / Manager / Staff
+  /// Step 1b: Manual configuration for development
+  Future<void> configureManual({required String url, required String key}) async {
+    final entry = StationRegistryEntry(
+      stationCode: 'MANUAL',
+      stationName: 'Local Development Station',
+      supabaseUrl: url,
+      anonKey: key,
+    );
+    await TenantService.instance.configure(entry);
+    state = state.copyWith(
+      stationCode: 'MANUAL',
+      stationName: 'Local Development Station',
+      stationConfigured: true,
+    );
+  }
+
+  /// Step 2: Unified login for all roles
   Future<bool> login({
     required String identifier,
     required String credential,
@@ -97,7 +119,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     state = state.withLoading();
     try {
-      final user = await AuthService.instance.loginStaff(
+      final user = await AuthService.instance.loginUnified(
         identifier: identifier,
         credential: credential,
         role: role,
@@ -128,6 +150,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   void clearError() {
     state = state.copyWith(error: null);
+  }
+
+  void enterDemoMode() {
+    TenantService.instance.configureDemoMode();
+    state = AuthState(
+      isDemoMode: true,
+      stationConfigured: true,
+      stationCode: 'DEMO001',
+      stationName: 'FuelOS Demo Station',
+      user: const AuthUser(
+        id: 'demo-user-id',
+        stationId: 'demo-station-id',
+        stationCode: 'DEMO001',
+        stationName: 'FuelOS Demo Station',
+        role: 'MANAGER',
+        fullName: 'Demo Manager',
+      ),
+    );
   }
 
   void clearStation() {

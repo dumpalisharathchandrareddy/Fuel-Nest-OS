@@ -3,6 +3,11 @@
 *.log
 *.pyc
 *.swp
+*.tmp
+*.temp
+*.lock
+*.bak
+*.orig
 .DS_Store
 .atom/
 .build/
@@ -18,10 +23,8 @@ migrate_working_dir/
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# VS Code
+.vscode/
 
 # Flutter/Dart/Pub related
 **/doc/api/
@@ -32,6 +35,10 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+/web/bundle.js
+/web/bundle.js.map
+.packages
+.generated/
 
 # Symbolication related
 app.*.symbols
@@ -39,7 +46,129 @@ app.*.symbols
 # Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
+# Android Studio
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# iOS/macOS build
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.moved-aside
+DerivedData
+*.hmap
+*.ipa
+*.xcuserstate
+*.dSYM.zip
+*.dSYM
+Pods/
+/ios/.symlinks
+*.xcworkspace
+!default.xcworkspace
+xcuserdata/
+/macos/Runner.xcodeproj/project.xcworkspace
+
+# macOS
+*.env.local
+.firebase
+
+# Linux
+.fvm/
+flutter_*.png
+*.pub-cache
+
+# Windows
+*.exe
+*.dll
+*.pdb
+
+# Test coverage
+coverage/
+*.gcov
+*.gcda
+*.gcno
+lcov.info
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Build outputs
+*.apk
+*.aab
+*.app
+*.framework
+*.dylib
+*.dll
+*.so
+*.keystore
+
+# Supabase/Backend migrations
+supabase/migrations/
+registry_supabase/migrations/
+
+# XML files (local config)
+android/app/*.xml
+android/app/src/debug/
+android/app/src/profile/
+android/gradle/
+android/local.properties
+android/.gradle/
+gradle/app/build
+gradle/build
+
+# JSON local configs
+*.json
+!pubspec.yaml
+analysis_options.yaml
+fuelos.iml
+
+# FVM (Flutter Version Manager)
+.fvm*
+
+# IDE swap files
+*.un~
+*~
+
+# Rust build
+target/
+Cargo.lock
+
+# Flutter platform builds
+linux/flutter/CMakeCache.txt
+linux/flutter/CMakeFiles/
+linux/flutter/*.cmake
+linux/flutter/compile_commands.json
+
+windows/CMakeCache.txt
+windows/CMakeFiles/
+windows/*.cmake
+windows/compile_commands.json
+
+# Android Gradle
+gradle.properties
+
+# iOS generated files
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+ios/Runner/GeneratedPluginRegistrant.h
+ios/Runner/GeneratedPluginRegistrant.m
+ios/Runner/GeneratedPluginRegistrant.swift
+
+# macOS generated files
+macos/Flutter/GeneratedPluginRegistrant.swift
+
+# Windows generated files
+windows/flutter/ephemeral/
+windows/flutter/generated_plugin_registrant.cc
+windows/flutter/generated_plugin_registrant.h
+windows/flutter/generated_plugins.cmake
+windows/runner/flutter_window.cpp
+windows/runner/flutter_window.h
+
+# Android build folder
+android/app/build/
+android/build/
