@@ -1,0 +1,29 @@
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    # Style
+    prefer_single_quotes: true
+    prefer_const_constructors: true
+    prefer_const_declarations: true
+    avoid_print: false           # we use print for debug in dev
+    use_key_in_widget_constructors: false  # too noisy during development
+
+    # Dart 3
+    use_super_parameters: true
+
+    # Disable overly strict rules for rapid development
+    public_member_api_docs: false
+    lines_longer_than_80_chars: false
+
+analyzer:
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - build/**
+  errors:
+    # Treat as warnings, not errors during dev
+    deprecated_member_use: warning
+    missing_required_param: error
+    missing_return: error
+    dead_code: warning

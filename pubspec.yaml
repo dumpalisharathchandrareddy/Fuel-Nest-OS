@@ -1,0 +1,72 @@
+name: fuelos
+description: FuelOS - Fuel Station Management System for India
+version: 1.0.0+1
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Supabase - direct DB connection, no Express server
+  supabase_flutter: ^2.5.6
+
+  # State management - modern, clean, AI-friendly
+  flutter_riverpod: ^2.5.1
+
+  # Navigation
+  go_router: ^14.2.7
+
+  # UI & Design
+  google_fonts: ^6.2.1
+  flutter_animate: ^4.5.0
+  gap: ^3.0.1
+
+  # Export - PDF and Excel generated on-device
+  pdf: ^3.11.1
+  printing: ^5.13.1
+  syncfusion_flutter_xlsio: ^27.1.48
+
+  # Google Drive backup
+  google_sign_in: ^6.2.1
+  googleapis: ^13.2.0
+  googleapis_auth: ^1.6.0
+  extension_google_sign_in_as_googleapis_auth: ^2.0.12
+
+  # Secure local storage
+  shared_preferences: ^2.3.2
+  flutter_secure_storage: ^9.2.2
+  path_provider: ^2.1.4
+
+  # Networking (Discord webhooks, registry lookup)
+  http: ^1.2.1
+
+  # Sharing files (WhatsApp, etc.)
+  share_plus: ^10.0.2
+
+  # Network status
+  connectivity_plus: ^6.1.0
+
+  # India time & formatting
+  intl: ^0.19.0
+  timezone: ^0.9.4
+
+  # Utilities
+  crypto: ^3.0.3
+  uuid: ^4.5.0
+  url_launcher: ^6.3.0
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/

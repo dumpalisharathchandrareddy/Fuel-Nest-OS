@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Network security configuration for FuelOS.
+  Allows HTTPS connections to Supabase and Discord webhook endpoints.
+  Required for Android API 24+ (Nougat and above).
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="false">
+        <!-- Supabase API (per-dealer instances) -->
+        <domain includeSubdomains="true">supabase.co</domain>
+        <!-- Discord webhook -->
+        <domain includeSubdomains="true">discord.com</domain>
+        <!-- Google APIs (Drive backup) -->
+        <domain includeSubdomains="true">googleapis.com</domain>
+        <domain includeSubdomains="true">accounts.google.com</domain>
+        <!-- General HTTPS -->
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </domain-config>
+</network-security-config>
