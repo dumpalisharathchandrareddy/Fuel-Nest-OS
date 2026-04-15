@@ -169,9 +169,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final stationName = ref.watch(stationNameProvider);
     final stationCode = ref.watch(authProvider).stationCode ?? '';
 
-    if (_loadingSettings)
+    if (_loadingSettings) {
       return const Scaffold(
           backgroundColor: AppColors.bgApp, body: LoadingView());
+    }
 
     return Scaffold(
       backgroundColor: AppColors.bgApp,
@@ -425,8 +426,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           'Sign out from FuelOS. Station code is remembered.',
                       confirmLabel: 'Logout',
                       isDanger: true);
-                  if (ok && mounted)
+                  if (ok && mounted) {
                     await ref.read(authProvider.notifier).logout();
+                  }
                 }),
             if (isDealer) ...[
               const SizedBox(height: 8),
@@ -440,8 +442,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         message:
                             'Clear session and return to station code screen.',
                         confirmLabel: 'Continue');
-                    if (ok && mounted)
+                    if (ok && mounted) {
                       ref.read(authProvider.notifier).clearStation();
+                    }
                   }),
             ],
             const SizedBox(height: 32),

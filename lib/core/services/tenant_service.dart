@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/app_constants.dart';
@@ -88,11 +90,12 @@ class TenantService {
 
   /// Set the Supabase session (access + refresh token) after login.
   Future<void> setSession(String accessToken, String refreshToken) async {
-    await client.auth.setSession(accessToken);
     await _storage.write(
       key: StorageKeys.userSession,
       value: '$accessToken|$refreshToken',
     );
+    // recoverSession sets both tokens so the client can auto-refresh on expiry
+    await client.auth.recoverSession(_sessionJson(accessToken, refreshToken));
   }
 
   /// Restore the saved session on app resume.
@@ -102,13 +105,22 @@ class TenantService {
     final parts = saved.split('|');
     if (parts.length < 2) return false;
     try {
-      // Add a timeout to prevent hanging on splash screen if URL is dead
-      await client.auth.setSession(parts[0]).timeout(const Duration(seconds: 8));
+      await client.auth
+          .recoverSession(_sessionJson(parts[0], parts[1]))
+          .timeout(const Duration(seconds: 8));
       return true;
     } catch (_) {
       return false;
     }
   }
+
+  static String _sessionJson(String accessToken, String refreshToken) =>
+      jsonEncode({
+        'access_token': accessToken,
+        'refresh_token': refreshToken,
+        'token_type': 'bearer',
+        'expires_in': 3600,
+      });
 
   /// Clear all tenant data on logout.
   Future<void> clearTenant() async {

@@ -1,0 +1,21 @@
+# Exclude third-party and generated directories
+macos/Pods/
+ios/Pods/
+android/.gradle/
+.dart_tool/
+.pub-cache/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.g.dart
+*.freezed.dart
+*.mocks.dart
+pubspec.lock
+*.lock
+# Build artifacts (build/ is already excluded by graphify internals)
+build/
+graphify-out/
+# Large generated files
+android/app/build/
+ios/build/
+macos/build/
+windows/build/

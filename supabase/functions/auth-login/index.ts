@@ -84,8 +84,11 @@ serve(async (req: Request) => {
 
     // ── 4. Get or create Supabase Auth user ───────────────────────────────────
     const internalEmail = `${user.id}@internal.fuelos.app`
-    const internalPassword =
-      user.id + (Deno.env.get('INTERNAL_SALT') ?? 'fuelos_salt_2025')
+    const salt = Deno.env.get('INTERNAL_SALT')
+    if (!salt) {
+      return json({ error: 'Server misconfiguration' }, 500)
+    }
+    const internalPassword = user.id + salt
     let supabaseAuthId = user.supabase_auth_id
 
     const authMeta = {

@@ -17,6 +17,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _phoneCtrl = TextEditingController();
   final _credentialCtrl = TextEditingController();
   bool _usePin = true;
+  String _role = 'STAFF';
+
+  static const _roles = [
+    ('PUMP_PERSON', 'Worker'),
+    ('STAFF', 'Staff'),
+    ('MANAGER', 'Manager'),
+    ('DEALER', 'Dealer'),
+  ];
 
   @override
   void dispose() {
@@ -32,6 +40,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final success = await ref.read(authProvider.notifier).login(
           identifier: _phoneCtrl.text.trim(),
           credential: _credentialCtrl.text.trim(),
+          role: _role,
+          isPin: _usePin,
         );
 
     if (success && mounted) {
@@ -111,7 +121,46 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     style: const TextStyle(
                         color: AppColors.textSecondary, fontSize: 15),
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 32),
+
+                  // Role selector
+                  const Text(
+                    'I am a',
+                    style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: _roles.map((r) {
+                      final selected = _role == r.$1;
+                      return ChoiceChip(
+                        label: Text(r.$2),
+                        selected: selected,
+                        onSelected: (v) {
+                          if (v) setState(() => _role = r.$1);
+                        },
+                        selectedColor: AppColors.blue,
+                        labelStyle: TextStyle(
+                          color: selected
+                              ? Colors.white
+                              : AppColors.textSecondary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        backgroundColor: AppColors.bgApp,
+                        side: BorderSide(
+                          color: selected
+                              ? AppColors.blue
+                              : AppColors.textMuted.withValues(alpha: 0.3),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 24),
 
                   // Phone number
                   AppTextField(
