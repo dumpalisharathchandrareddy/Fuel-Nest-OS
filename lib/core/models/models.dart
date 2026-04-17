@@ -58,7 +58,8 @@ class Shift {
   });
 
   bool get isOpen => status == 'OPEN';
-  bool get isClosed => status == 'CLOSED';
+  bool get isSubmitted => status == 'SUBMITTED';
+  bool get isClosed => status == 'CLOSED' || status == 'SETTLED';
   bool get isSettled => status == 'SETTLED';
 
   /// Computed — Shift has no sale_amount column.

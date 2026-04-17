@@ -139,7 +139,7 @@ class _ShiftListScreenState extends ConsumerState<ShiftListScreen>
           .eq('station_id', user.stationId);
 
       if (_statusFilter == _StatusFilter.active) {
-        query = query.eq('status', 'OPEN');
+        query = query.inFilter('status', ['OPEN', 'SUBMITTED']);
       } else if (_statusFilter == _StatusFilter.closed) {
         query = query.inFilter('status', ['CLOSED', 'SETTLED']);
         switch (_dateTab) {
@@ -258,7 +258,7 @@ class _ShiftListScreenState extends ConsumerState<ShiftListScreen>
                                 label: 'Add Pump',
                                 onTap: () {
                                   Navigator.pop(ctx);
-                                  context.go('/hardware');
+                                  context.push('/app/hardware');
                                 }),
                           ]),
                         )
@@ -318,7 +318,7 @@ class _ShiftListScreenState extends ConsumerState<ShiftListScreen>
                                 label: 'Add Staff',
                                 onTap: () {
                                   Navigator.pop(ctx);
-                                  context.go('/staff');
+                                  context.push('/app/staff');
                                 }),
                           ]),
                         )
@@ -349,10 +349,14 @@ class _ShiftListScreenState extends ConsumerState<ShiftListScreen>
                           items: [
                             const DropdownMenuItem(
                                 value: null, child: Text('Unassigned')),
-                            ..._workers.map((w) => DropdownMenuItem<String>(
+                            ..._workers.map((w) {
+                              final role = w['role']?.toString() ?? 'Staff';
+                              final displayRole = role == 'PUMP_PERSON' ? 'Staff' : role;
+                              return DropdownMenuItem<String>(
                                 value: w['id'] as String,
-                                child: Text(
-                                    '${w['full_name']} (${w['role'] == 'PUMP_PERSON' ? 'Staff' : w['role']})'))),
+                                child: Text('${w['full_name']} ($displayRole)'),
+                              );
+                            }),
                           ],
                           onChanged: (v) => ss(() => selWorkerId = v),
                         ),
@@ -402,6 +406,14 @@ class _ShiftListScreenState extends ConsumerState<ShiftListScreen>
                                             'id, fuel_type, default_testing, tank_id')
                                         .eq('pump_id', selPumpId!)
                                         .eq('active', true);
+
+                                    if ((nozzles as List).isEmpty) {
+                                      ss(() {
+                                        launching = false;
+                                        launchErr = 'This pump has no active nozzles. Configure nozzles first.';
+                                      });
+                                      return;
+                                    }
                                     final rates = await db
                                         .from('FuelRate')
                                         .select('fuel_type, rate')
@@ -638,9 +650,10 @@ class _ShiftListScreenState extends ConsumerState<ShiftListScreen>
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.border)),
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+      ),
       child: Row(children: [
         _SumCell('Shifts', '${_shifts.length}'),
         Container(width: 1, height: 32, color: AppColors.border),
@@ -691,11 +704,14 @@ class _ShiftListScreenState extends ConsumerState<ShiftListScreen>
                       child: CustomScrollView(slivers: [
                         SliverToBoxAdapter(child: _buildSummary()),
                         if (_shifts.isEmpty)
-                          const SliverFillRemaining(
+                          SliverFillRemaining(
                               child: EmptyView(
-                                  title: 'No shifts found',
-                                  subtitle:
-                                      'Shifts will appear here once opened',
+                                  title: _statusFilter == _StatusFilter.active 
+                                      ? 'No active shifts' 
+                                      : 'No shifts records found',
+                                  subtitle: _statusFilter == _StatusFilter.active
+                                      ? 'Tap "Open Shift" to start a new shift'
+                                      : 'No shifts found for the selected period',
                                   icon: Icons.swap_horiz_outlined))
                         else
                           SliverPadding(
@@ -707,18 +723,20 @@ class _ShiftListScreenState extends ConsumerState<ShiftListScreen>
                                   child: _ShiftCard(
                                     shift: _shifts[i],
                                     onTap: () {
-                                      final status = (_shifts[i]
-                                              as Map)['status'] as String? ??
-                                          '';
-                                      final pumpId =
-                                          ((_shifts[i] as Map)['pump']
-                                                  as Map?)?['id'] as String? ??
-                                              '';
+                                      final s = Map<String, dynamic>.from(_shifts[i] as Map);
+                                      final status = s['status'] as String? ?? '';
+                                      final pumpId = (s['pump'] as Map?)?['id'] as String? ?? '';
+                                      final role = user?.role ?? '';
+
                                       if (status == 'OPEN') {
-                                        context.go('/worker/nozzle/$pumpId');
+                                        if (role == 'PUMP_PERSON') {
+                                          context.push('/worker/nozzle/$pumpId');
+                                        } else {
+                                          context.push('/app/shifts/execution/${s['id']}');
+                                        }
                                       } else {
-                                        context.go(
-                                            '/app/shifts/payment/${(_shifts[i] as Map)['id']}');
+                                        // SUBMITTED or CLOSED go to reconciliation/settlement
+                                        context.push('/app/shifts/payment/${s['id']}');
                                       }
                                     },
                                   )),
@@ -760,7 +778,7 @@ class _ShiftCard extends StatelessWidget {
 
     return AppCard(
       onTap: onTap,
-      borderColor: isOpen ? AppColors.green.withValues(alpha: 0.25) : null,
+      borderColor: isOpen ? AppColors.green.withOpacity(0.25) : null,
       child: Column(children: [
         Row(children: [
           Container(

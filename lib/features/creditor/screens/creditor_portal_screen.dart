@@ -165,7 +165,7 @@ class _CreditorPortalScreenState extends ConsumerState<CreditorPortalScreen> {
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                             color:
-                                AppColors.textPrimary.withValues(alpha: 0.1)),
+                                AppColors.textPrimary.withOpacity(0.1)),
                       ),
                       child: const Icon(Icons.credit_card,
                           color: AppColors.purple, size: 20),
@@ -208,7 +208,7 @@ class _CreditorPortalScreenState extends ConsumerState<CreditorPortalScreen> {
                       color: AppColors.redBg,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                          color: AppColors.red.withValues(alpha: 0.3)),
+                          color: AppColors.red.withOpacity(0.3)),
                     ),
                     child: Row(children: [
                       const Icon(Icons.error_outline,
@@ -226,7 +226,7 @@ class _CreditorPortalScreenState extends ConsumerState<CreditorPortalScreen> {
                 if (_step != _CreditorStep.viewBalance)
                   Center(
                     child: TextButton(
-                      onPressed: () => context.go('/station'),
+                      onPressed: () => context.pop(),
                       child: const Text('Staff / Manager? Sign in here',
                           style: TextStyle(
                               color: AppColors.textMuted, fontSize: 12)),
@@ -309,8 +309,8 @@ class _CreditorPortalScreenState extends ConsumerState<CreditorPortalScreen> {
       // Customer summary card
       AppCard(
         borderColor: isOverLimit
-            ? AppColors.red.withValues(alpha: 0.3)
-            : AppColors.green.withValues(alpha: 0.2),
+            ? AppColors.red.withOpacity(0.3)
+            : AppColors.green.withOpacity(0.2),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             Container(
@@ -479,7 +479,7 @@ class _CreditorPortalScreenState extends ConsumerState<CreditorPortalScreen> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                        color: AppColors.red.withValues(alpha: 0.1),
+                        color: AppColors.red.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(4)),
                     child: const Icon(Icons.arrow_downward,
                         color: AppColors.green, size: 14),

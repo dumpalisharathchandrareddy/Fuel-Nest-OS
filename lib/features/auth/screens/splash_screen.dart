@@ -25,16 +25,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         vsync: this, duration: const Duration(milliseconds: 800));
     _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeIn);
     _ctrl.forward();
-    _init();
-  }
-
-  Future<void> _init() async {
-    // Initialize the auth state.
-    // GoRouter's refreshListenable will detect the change and handle redirection.
-    await ref.read(authProvider.notifier).initialize();
-
-    // Small delay for the fade animation to show
-    await Future.delayed(const Duration(milliseconds: 1500));
   }
 
   @override
@@ -60,7 +50,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   color: AppColors.blueBg,
                   borderRadius: BorderRadius.circular(18),
                   border:
-                      Border.all(color: AppColors.blue.withValues(alpha: 0.3)),
+                      Border.all(color: AppColors.blue.withOpacity(0.3)),
                 ),
                 child: const Icon(Icons.local_gas_station,
                     color: AppColors.blue, size: 36),
@@ -86,6 +76,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                 height: 24,
                 child: CircularProgressIndicator(
                     strokeWidth: 2, color: AppColors.blue),
+              ),
+              const SizedBox(height: 16),
+              Consumer(
+                builder: (context, ref, _) {
+                  final stage = ref.watch(authProvider).loadingStage;
+                  return Text(
+                    stage,
+                    style: TextStyle(
+                      color: AppColors.textMuted.withOpacity(0.7),
+                      fontSize: 12,
+                      letterSpacing: 0.5,
+                    ),
+                  );
+                },
               ),
             ],
           ),

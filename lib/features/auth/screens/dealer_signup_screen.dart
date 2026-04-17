@@ -31,7 +31,8 @@ class _DealerSignupScreenState extends ConsumerState<DealerSignupScreen> {
   final _codeCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
   final _cityCtrl = TextEditingController();
-  String? _selectedState;
+  final _stateCtrl = TextEditingController();
+  final _stateFocus = FocusNode();
 
   // Owner info
   final _ownerNameCtrl = TextEditingController();
@@ -58,11 +59,13 @@ class _DealerSignupScreenState extends ConsumerState<DealerSignupScreen> {
       _cityCtrl,
       _ownerNameCtrl,
       _phoneCtrl,
+      _stateCtrl,
       _passwordCtrl,
       _confirmPassCtrl,
     ]) {
       c.dispose();
     }
+    _stateFocus.dispose();
     _step.dispose();
     super.dispose();
   }
@@ -111,7 +114,7 @@ class _DealerSignupScreenState extends ConsumerState<DealerSignupScreen> {
           anonKey: _anonKeyCtrl.text.trim(),
           dbMode: _dbMode ?? 'byo',
           city: _cityCtrl.text.trim(),
-          state: _selectedState ?? '',
+          state: _stateCtrl.text.trim(),
         );
     if (!ok && mounted) {
       setState(() {
@@ -125,26 +128,23 @@ class _DealerSignupScreenState extends ConsumerState<DealerSignupScreen> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    final isWide = size.width > 600;
-
     return Scaffold(
       backgroundColor: AppColors.bgApp,
       appBar: AppBar(
         title: const Text('Register Your Station'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, size: 18),
-          onPressed: () => context.go('/station'),
+          onPressed: () => context.pop(),
         ),
       ),
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(
-              horizontal: isWide ? size.width * 0.25 : 24,
-              vertical: 24,
-            ),
-          child: Form(
-            key: _form,
+        child: SingleChildScrollView(
+          child: Center(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 500),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              child: Form(
+                key: _form,
             child: ValueListenableBuilder(
               valueListenable: _step,
               builder: (_, step, __) {
@@ -246,9 +246,10 @@ class _DealerSignupScreenState extends ConsumerState<DealerSignupScreen> {
           ),
         ),
       ),
-      ),
-    );
-  }
+    ),
+  ),
+);
+}
 
   List<Widget> _buildStep0() => [
         const Text(
@@ -390,7 +391,7 @@ class _DealerSignupScreenState extends ConsumerState<DealerSignupScreen> {
           validator: (v) => Validators.name(v, 'Station Name'),
         ),
         const SizedBox(height: 16),
-        if (MediaQuery.sizeOf(context).width < 400) ...[
+        if (MediaQuery.sizeOf(context).width < 700) ...[
           AppTextField(
             label: 'City',
             controller: _cityCtrl,
@@ -401,22 +402,13 @@ class _DealerSignupScreenState extends ConsumerState<DealerSignupScreen> {
             validator: Validators.city,
           ),
           const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            value: _selectedState,
-            decoration: const InputDecoration(
-              labelText: 'State',
-              prefixIcon: Icon(Icons.map_outlined, size: 18),
-            ),
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 14,
-            ),
-            dropdownColor: AppColors.bgCard,
-            items: AppConstants.indianStates.map((s) {
-              return DropdownMenuItem(value: s, child: Text(s));
-            }).toList(),
-            onChanged: (v) => setState(() => _selectedState = v),
-            validator: (v) => v == null ? 'Required' : null,
+          AppAutocompleteField(
+            label: 'State',
+            controller: _stateCtrl,
+            focusNode: _stateFocus,
+            suggestions: AppConstants.indianStates,
+            prefixIcon: Icons.map_outlined,
+            validator: Validators.state,
           ),
         ] else
           Row(
@@ -434,22 +426,13 @@ class _DealerSignupScreenState extends ConsumerState<DealerSignupScreen> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: _selectedState,
-                  decoration: const InputDecoration(
-                    labelText: 'State',
-                    prefixIcon: Icon(Icons.map_outlined, size: 18),
-                  ),
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 14,
-                  ),
-                  dropdownColor: AppColors.bgCard,
-                  items: AppConstants.indianStates.map((s) {
-                    return DropdownMenuItem(value: s, child: Text(s));
-                  }).toList(),
-                  onChanged: (v) => setState(() => _selectedState = v),
-                  validator: (v) => v == null ? 'Required' : null,
+                child: AppAutocompleteField(
+                  label: 'State',
+                  controller: _stateCtrl,
+                  focusNode: _stateFocus,
+                  suggestions: AppConstants.indianStates,
+                  prefixIcon: Icons.map_outlined,
+                  validator: Validators.state,
                 ),
               ),
             ],

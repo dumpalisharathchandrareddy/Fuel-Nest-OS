@@ -41,32 +41,41 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       if (kDebugMode) {
         debugPrint(
-            'ROUTER REDIRECT: loc=$loc, stationSet=$stationSet, loggedIn=$loggedIn');
+            '[ROUTER] 🚦 Redirect check: loc=$loc, stationSet=$stationSet, loggedIn=$loggedIn, loading=${auth.isLoading}');
       }
 
-      if (loc == '/splash') {
-        if (auth.isLoading) return null;
-        // Proceed to check stationSet and loggedIn below
+      // 1. Block all redirects while state is loading (during app boot)
+      if (auth.isLoading) {
+        if (loc == '/splash') return null;
+        debugPrint('[ROUTER] 🧊 App is loading, staying on $loc');
+        return '/splash';
       }
 
+      // 2. Station Technical Config Guard (Case A: No station)
       if (!stationSet) {
         if (loc == '/station' || loc == '/signup') return null;
+        debugPrint('[ROUTER] 🛡️ [CASE A] Station not set. Sending to /station');
         return '/station';
       }
 
+      // 3. Authentication Guard (Case B: Station set, but not logged in)
       if (!loggedIn) {
         if (loc == '/login' || loc == '/signup' || loc == '/creditor') {
           return null;
         }
+        debugPrint('[ROUTER] 🔐 [CASE B] Not logged in. Sending to /login');
         return '/login';
       }
 
-      if (loc == '/login' || loc == '/station' || loc == '/signup') {
+      // 4. Already Logged In (Case C: Success)
+      if (loc == '/login' || loc == '/station' || loc == '/signup' || loc == '/splash' || loc == '/creditor') {
         final dest =
             auth.user?.role == 'PUMP_PERSON' ? '/worker' : '/app/dashboard';
+        debugPrint('[ROUTER] ✅ [CASE C] Authenticated. Routing to $dest');
         return dest;
       }
 
+      debugPrint('[ROUTER] 🟢 No redirect needed for $loc');
       return null;
     },
     routes: [
@@ -102,6 +111,16 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
               path: '/app/shifts',
               pageBuilder: (_, __) => _noTransition(const ShiftListScreen())),
+          GoRoute(
+            path: '/app/shifts/execution/:shiftId',
+            builder: (_, s) =>
+                ShiftExecutionScreen(shiftId: s.pathParameters['shiftId']!),
+          ),
+          GoRoute(
+            path: '/app/shifts/nozzle/:pumpId',
+            builder: (_, s) =>
+                NozzleEntryScreen(pumpId: s.pathParameters['pumpId']!),
+          ),
           GoRoute(
             path: '/app/shifts/payment/:shiftId',
             builder: (_, s) => PaymentReconciliationScreen(
@@ -167,7 +186,7 @@ final routerNotifierProvider = ChangeNotifierProvider<_RouterNotifier>((ref) {
 class _RouterNotifier extends ChangeNotifier {
   void trigger() {
     if (kDebugMode) {
-      debugPrint('ROUTER: Notifier triggered by auth change');
+      debugPrint('[ROUTER] ⚡ Notifier triggered by auth change');
     }
     notifyListeners();
   }

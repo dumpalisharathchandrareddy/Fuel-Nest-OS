@@ -295,7 +295,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
                                   color:
-                                      AppColors.green.withValues(alpha: 0.3))),
+                                      AppColors.green.withOpacity(0.3))),
                           child: Row(children: [
                             const Icon(Icons.check_circle,
                                 color: AppColors.green, size: 18),
@@ -328,11 +328,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
-                                color: AppColors.green.withValues(alpha: 0.12),
+                                color: AppColors.green.withOpacity(0.12),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
                                     color: AppColors.green
-                                        .withValues(alpha: 0.3))),
+                                        .withOpacity(0.3))),
                             child: Row(children: [
                               const Icon(Icons.cloud_done_outlined,
                                   color: AppColors.green, size: 14),

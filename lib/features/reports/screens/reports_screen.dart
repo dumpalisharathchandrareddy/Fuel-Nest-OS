@@ -567,7 +567,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                                 horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
                                 color: sel
-                                    ? color.withValues(alpha: 0.15)
+                                    ? color.withOpacity(0.15)
                                     : AppColors.bgCard,
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(

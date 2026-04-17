@@ -332,7 +332,7 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
                     ..._archiveRequests.map((req) => Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: AppCard(
-                            borderColor: AppColors.amber.withValues(alpha: 0.3),
+                            borderColor: AppColors.amber.withOpacity(0.3),
                             child: Row(children: [
                               Expanded(
                                   child: Column(
@@ -476,7 +476,7 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
                                 height: 44,
                                 decoration: BoxDecoration(
                                     color: isActive
-                                        ? roleColor.withValues(alpha: 0.12)
+                                        ? roleColor.withOpacity(0.12)
                                         : AppColors.bgHover,
                                     borderRadius: BorderRadius.circular(12)),
                                 alignment: Alignment.center,
@@ -810,7 +810,7 @@ class _StaffFormSheetState extends ConsumerState<StaffFormSheet> {
               margin: EdgeInsets.only(right: r == 'MANAGER' ? 8 : 0),
               padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
-                  color: sel ? color.withValues(alpha: 0.15) : AppColors.bgCard,
+                  color: sel ? color.withOpacity(0.15) : AppColors.bgCard,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                       color: sel ? color : AppColors.border,

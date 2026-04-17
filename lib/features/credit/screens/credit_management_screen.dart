@@ -364,9 +364,9 @@ class _CreditManagementScreenState
                           }
                         },
                         borderColor: isOver
-                            ? AppColors.red.withValues(alpha: 0.3)
+                            ? AppColors.red.withOpacity(0.3)
                             : (outstanding > 0
-                                ? AppColors.amber.withValues(alpha: 0.2)
+                                ? AppColors.amber.withOpacity(0.2)
                                 : null),
                         child: Row(children: [
                           Container(

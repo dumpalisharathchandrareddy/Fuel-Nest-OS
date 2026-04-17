@@ -163,7 +163,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         side: BorderSide(
                           color: selected
                               ? AppColors.blue
-                              : AppColors.textMuted.withValues(alpha: 0.3),
+                              : AppColors.textMuted.withOpacity(0.3),
                         ),
                         padding: const EdgeInsets.symmetric(horizontal: 4),
                       );
@@ -234,7 +234,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         color: AppColors.redBg,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                            color: AppColors.red.withValues(alpha: 0.2)),
+                            color: AppColors.red.withOpacity(0.2)),
                       ),
                       child: Row(
                         children: [

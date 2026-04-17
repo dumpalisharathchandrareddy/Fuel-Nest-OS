@@ -97,7 +97,7 @@ class _WorkerHomeScreenState extends ConsumerState<WorkerHomeScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.account_balance_wallet_outlined, size: 20),
-            onPressed: () => context.go('/worker/earnings'),
+            onPressed: () => context.push('/worker/earnings'),
             tooltip: 'My Earnings',
           ),
           IconButton(
@@ -124,7 +124,7 @@ class _WorkerHomeScreenState extends ConsumerState<WorkerHomeScreen> {
                         SliverToBoxAdapter(
                           child: GestureDetector(
                             onTap: () => context
-                                .go('/worker/shift/${_activeShift!['id']}'),
+                                .push('/worker/shift/${_activeShift!['id']}'),
                             child: Container(
                               margin: const EdgeInsets.all(16),
                               padding: const EdgeInsets.all(16),
@@ -132,8 +132,7 @@ class _WorkerHomeScreenState extends ConsumerState<WorkerHomeScreen> {
                                 color: AppColors.greenBg,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                    color:
-                                        AppColors.green.withValues(alpha: 0.3)),
+                                    color: AppColors.green.withValues(alpha: 0.1)),
                               ),
                               child: Row(
                                 children: [
@@ -220,7 +219,7 @@ class _WorkerHomeScreenState extends ConsumerState<WorkerHomeScreen> {
                                 pump: _pumps[i],
                                 hasActiveShift: _activeShift != null,
                                 onTap: () => context
-                                    .go('/worker/nozzle/${_pumps[i]['id']}'),
+                                    .push('/worker/nozzle/${_pumps[i]['id']}'),
                               ),
                               childCount: _pumps.length,
                             ),
@@ -309,6 +308,7 @@ class _NozzleEntryScreenState extends ConsumerState<NozzleEntryScreen> {
   Map<String, dynamic>? _shift;
   List<Map<String, dynamic>> _readings = [];
   final Map<String, TextEditingController> _controllers = {};
+  final Map<String, TextEditingController> _testingControllers = {};
 
   @override
   void initState() {
@@ -319,6 +319,9 @@ class _NozzleEntryScreenState extends ConsumerState<NozzleEntryScreen> {
   @override
   void dispose() {
     for (final c in _controllers.values) {
+      c.dispose();
+    }
+    for (final c in _testingControllers.values) {
       c.dispose();
     }
     super.dispose();
@@ -338,14 +341,14 @@ class _NozzleEntryScreenState extends ConsumerState<NozzleEntryScreen> {
         return;
       }
 
-      // Get active shift for this pump or create one
+      // Get any active or recently finished shift for this pump
       final shifts = await db
           .from('Shift')
           .select(
-              'id, status, created_at, nozzle_entries:NozzleEntry(id, nozzle_id, opening_reading, closing_reading, nozzle:Nozzle(label, fuel_type))')
+              'id, status, created_at, nozzle_entries:NozzleEntry(id, nozzle_id, opening_reading, closing_reading, testing_quantity, rate, nozzle:Nozzle(label, fuel_type))')
           .eq('pump_id', widget.pumpId)
           .eq('station_id', user.stationId)
-          .eq('status', 'OPEN')
+          .order('created_at', ascending: false)
           .limit(1);
 
       if (shifts.isEmpty) {
@@ -378,6 +381,8 @@ class _NozzleEntryScreenState extends ConsumerState<NozzleEntryScreen> {
           'fuel_type': nozzle['fuel_type'] ?? '',
           'opening_reading': e['opening_reading'],
           'closing_reading': e['closing_reading'],
+          'testing_quantity': e['testing_quantity'],
+          'rate': e['rate'],
         };
       }).toList();
 
@@ -386,6 +391,9 @@ class _NozzleEntryScreenState extends ConsumerState<NozzleEntryScreen> {
         final key = r['nozzle_id'] as String;
         _controllers[key] = TextEditingController(
           text: r['closing_reading']?.toString() ?? '',
+        );
+        _testingControllers[key] = TextEditingController(
+          text: r['testing_quantity']?.toString() ?? '0',
         );
       }
 
@@ -409,6 +417,8 @@ class _NozzleEntryScreenState extends ConsumerState<NozzleEntryScreen> {
       final val = double.tryParse(_controllers[key]?.text ?? '');
       final opening =
           double.tryParse(r['opening_reading']?.toString() ?? '0') ?? 0;
+      final testing = double.tryParse(_testingControllers[key]?.text ?? '0') ?? 0;
+      
       if (val == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Enter closing reading for ${r['label']}')),
@@ -420,6 +430,14 @@ class _NozzleEntryScreenState extends ConsumerState<NozzleEntryScreen> {
           SnackBar(
               content:
                   Text('Closing reading must be >= opening for ${r['label']}')),
+        );
+        return;
+      }
+      if (testing > (val - opening)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content:
+                  Text('Testing qty (${testing.toStringAsFixed(2)}) exceeds sales (${(val - opening).toStringAsFixed(2)}) for ${r['label']}')),
         );
         return;
       }
@@ -437,17 +455,34 @@ class _NozzleEntryScreenState extends ConsumerState<NozzleEntryScreen> {
     try {
       final db = TenantService.instance.client;
 
-      // Update each nozzle entry with closing reading
+      // Update each nozzle entry with closing reading and calculated sales
       for (final r in _readings) {
         final key = r['nozzle_id'] as String;
-        final val = double.parse(_controllers[key]!.text);
-        // NozzleEntry update: closing_reading triggers sale_litres/sale_amount recalculation
-        // (done by backend trigger or edge function in production)
+        final closing = double.parse(_controllers[key]!.text);
+        final testing = double.tryParse(_testingControllers[key]!.text) ?? 0;
+        final opening = double.tryParse(r['opening_reading']?.toString() ?? '0') ?? 0;
+        final rate = double.tryParse(r['rate']?.toString() ?? '0') ?? 0;
+        
+        final saleLitres = (closing - opening - testing);
+        final saleAmount = saleLitres * rate;
+
         await db.from('NozzleEntry').update({
-          'closing_reading': val,
+          'closing_reading': closing,
+          'testing_quantity': testing,
+          'sale_litres': saleLitres,
+          'sale_amount': saleAmount,
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         }).eq('id', r['entry_id']);
       }
+
+      if (_shift == null) return;
+
+      // Update shift status to SUBMITTED
+      await db.from('Shift').update({
+        'status': 'SUBMITTED',
+        'submitted_at': DateTime.now().toUtc().toIso8601String(),
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', _shift!['id']);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -456,7 +491,7 @@ class _NozzleEntryScreenState extends ConsumerState<NozzleEntryScreen> {
             backgroundColor: AppColors.green,
           ),
         );
-        context.go('/worker');
+        context.pop();
       }
     } catch (e) {
       if (mounted) {
@@ -477,7 +512,7 @@ class _NozzleEntryScreenState extends ConsumerState<NozzleEntryScreen> {
         title: const Text('Nozzle Entry'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, size: 18),
-          onPressed: () => context.go('/worker'),
+          onPressed: () => context.pop(),
         ),
       ),
       body: _loading
@@ -490,6 +525,26 @@ class _NozzleEntryScreenState extends ConsumerState<NozzleEntryScreen> {
                       child: ListView(
                         padding: const EdgeInsets.all(20),
                         children: [
+                          if (_shift!['status'] != 'OPEN')
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: AppCard(
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.lock_outline,
+                                        color: AppColors.amber, size: 18),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      'Shift is ${_shift!['status']}. View-only mode.',
+                                      style: const TextStyle(
+                                          color: AppColors.amber,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           // Shift info
                           AppCard(
                             child: Row(
@@ -598,7 +653,7 @@ class _NozzleEntryScreenState extends ConsumerState<NozzleEntryScreen> {
                                                       fontSize: 11)),
                                               const SizedBox(height: 4),
                                               SizedBox(
-                                                width: 120,
+                                                width: 140,
                                                 child: TextFormField(
                                                   controller: _controllers[key],
                                                   keyboardType:
@@ -606,9 +661,10 @@ class _NozzleEntryScreenState extends ConsumerState<NozzleEntryScreen> {
                                                           .numberWithOptions(
                                                           decimal: true),
                                                   textAlign: TextAlign.right,
+                                                  enabled: !(_shift!['status'] != 'OPEN' || _submitting),
+                                                  onChanged: (_) => setState(() {}),
                                                   style: const TextStyle(
-                                                    color:
-                                                        AppColors.textPrimary,
+                                                    color: AppColors.textPrimary,
                                                     fontSize: 18,
                                                     fontWeight: FontWeight.w700,
                                                   ),
@@ -659,34 +715,79 @@ class _NozzleEntryScreenState extends ConsumerState<NozzleEntryScreen> {
                                         ),
                                       ],
                                     ),
-                                    // Live volume preview
-                                    ValueListenableBuilder(
-                                      valueListenable: _controllers[key]!,
-                                      builder: (_, v, __) {
-                                        final closing = double.tryParse(v.text);
-                                        if (closing == null ||
-                                            closing <= opening) {
-                                          return const SizedBox.shrink();
-                                        }
-                                        final vol = closing - opening;
-                                        return Padding(
-                                          padding:
-                                              const EdgeInsets.only(top: 10),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 10, vertical: 6),
-                                            decoration: BoxDecoration(
-                                              color: AppColors.greenBg,
-                                              borderRadius:
-                                                  BorderRadius.circular(6),
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      children: [
+                                        const Expanded(
+                                          child: Text(
+                                            'Testing / Calibration Qty',
+                                            style: TextStyle(
+                                              color: AppColors.textSecondary,
+                                              fontSize: 12,
                                             ),
-                                            child: Text(
-                                              '${IndianCurrency.formatLitres(vol)} dispensed',
-                                              style: const TextStyle(
-                                                  color: AppColors.green,
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w600),
+                                          ),
+                                        ),
+                                        SizedBox(
+                                          width: 80,
+                                          child: TextFormField(
+                                            controller: _testingControllers[key],
+                                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                            textAlign: TextAlign.right,
+                                            onChanged: (_) => setState(() {}),
+                                            style: const TextStyle(
+                                              color: AppColors.textPrimary,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
                                             ),
+                                            decoration: InputDecoration(
+                                              suffixText: ' L',
+                                              suffixStyle: const TextStyle(fontSize: 10, color: AppColors.textMuted),
+                                              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              border: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.border)),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    // Live preview
+                                    Builder(
+                                      builder: (context) {
+                                        final closing = double.tryParse(_controllers[key]!.text) ?? 0;
+                                        final testing = double.tryParse(_testingControllers[key]!.text) ?? 0;
+                                        final rate = double.tryParse(r['rate']?.toString() ?? '0') ?? 0;
+                                        
+                                        if (closing <= opening) return const SizedBox.shrink();
+                                        
+                                        final netLitres = (closing - opening - testing).clamp(0, double.infinity);
+                                        final amount = netLitres * rate;
+                                        
+                                        return Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.blue.withValues(alpha: 0.05),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: AppColors.blue.withValues(alpha: 0.1)),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  const Text('Net Sales (Litres)', style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
+                                                  Text(IndianCurrency.formatLitres(netLitres), style: const TextStyle(color: AppColors.blue, fontWeight: FontWeight.w700, fontSize: 16)),
+                                                ],
+                                              ),
+                                              Column(
+                                                crossAxisAlignment: CrossAxisAlignment.end,
+                                                children: [
+                                                  const Text('Estimated Sale', style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
+                                                  Text(IndianCurrency.format(amount), style: const TextStyle(color: AppColors.green, fontWeight: FontWeight.w700, fontSize: 16)),
+                                                ],
+                                              ),
+                                            ],
                                           ),
                                         );
                                       },
@@ -701,20 +802,21 @@ class _NozzleEntryScreenState extends ConsumerState<NozzleEntryScreen> {
                     ),
 
                     // Submit button
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: const BoxDecoration(
-                        color: AppColors.bgSurface,
-                        border:
-                            Border(top: BorderSide(color: AppColors.border)),
+                    if (_shift!['status'] == 'OPEN')
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: const BoxDecoration(
+                          color: AppColors.bgSurface,
+                          border:
+                              Border(top: BorderSide(color: AppColors.border)),
+                        ),
+                        child: AppButton(
+                          label: 'Submit Readings',
+                          onTap: _submit,
+                          loading: _submitting,
+                          width: double.infinity,
+                        ),
                       ),
-                      child: AppButton(
-                        label: 'Submit Readings',
-                        onTap: _submit,
-                        loading: _submitting,
-                        width: double.infinity,
-                      ),
-                    ),
                   ],
                 ),
     );
@@ -736,7 +838,6 @@ class _ShiftExecutionScreenState extends ConsumerState<ShiftExecutionScreen> {
   bool _loading = true;
   String? _error;
   Map<String, dynamic>? _shift;
-  final bool _closing = false;
 
   @override
   void initState() {
@@ -754,7 +855,7 @@ class _ShiftExecutionScreenState extends ConsumerState<ShiftExecutionScreen> {
       final shift = await db
           .from('Shift')
           .select(
-              'id, status, created_at, business_date, pump:Pump(name), assigned_worker:User(full_name), nozzle_entries:NozzleEntry(id, opening_reading, closing_reading, sale_litres, sale_amount, rate, nozzle:Nozzle(label, fuel_type))')
+              'id, status, created_at, business_date, pump:Pump(id, name), assigned_worker:User(full_name), nozzle_entries:NozzleEntry(id, opening_reading, closing_reading, testing_quantity, sale_litres, sale_amount, rate, nozzle:Nozzle(label, fuel_type))')
           .eq('id', widget.shiftId)
           .single();
       setState(() {
@@ -767,21 +868,6 @@ class _ShiftExecutionScreenState extends ConsumerState<ShiftExecutionScreen> {
         _loading = false;
       });
     }
-  }
-
-  Future<void> _submitReadings() async {
-    if (_shift == null) return;
-    final entries = _shift!['nozzle_entries'] as List? ?? [];
-    final allFilled =
-        entries.every((e) => (e as Map)['closing_reading'] != null);
-    if (!allFilled) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Enter all closing readings first')));
-      }
-      return;
-    }
-    context.go('/worker/nozzle/${_shift!['pump']['id'] ?? ''}');
   }
 
   @override
@@ -824,7 +910,7 @@ class _ShiftExecutionScreenState extends ConsumerState<ShiftExecutionScreen> {
         ]),
         leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios, size: 18),
-            onPressed: () => context.go('/worker')),
+            onPressed: () => context.pop()),
         actions: [
           StatusBadge.fromStatus(status),
           const SizedBox(width: 12),
@@ -933,6 +1019,14 @@ class _ShiftExecutionScreenState extends ConsumerState<ShiftExecutionScreen> {
                                     style: const TextStyle(
                                         color: AppColors.textMuted,
                                         fontSize: 12)),
+                                if (double.tryParse(entry['testing_quantity']?.toString() ?? '0') != 0)
+                                  Text(
+                                    ' (Test: ${IndianCurrency.formatLitres(double.parse(entry['testing_quantity'].toString()))})',
+                                    style: const TextStyle(
+                                        color: AppColors.amber,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600)),
+                                const Spacer(),
                                 Text(IndianCurrency.format(amount),
                                     style: const TextStyle(
                                         color: AppColors.green,
@@ -949,9 +1043,41 @@ class _ShiftExecutionScreenState extends ConsumerState<ShiftExecutionScreen> {
                   label: 'Enter Nozzle Readings',
                   icon: Icons.edit_outlined,
                   width: double.infinity,
-                  onTap: () => context.go(
-                      '/worker/nozzle/${(_shift!['pump'] as Map?)?['id'] ?? ''}'),
+                  onTap: () {
+                    final pumpId = (_shift!['pump'] as Map?)?['id'] as String? ?? '';
+                    if (pumpId.isNotEmpty) {
+                      final user = ref.read(currentUserProvider);
+                      final isWorker = user?.role == 'PUMP_PERSON';
+                      final base = isWorker ? '/worker' : '/app/shifts';
+                      context.push('$base/nozzle/$pumpId');
+                    }
+                  },
                 ),
+              if (status == 'SUBMITTED') ...[
+                AppButton(
+                  label: 'Reconcile & Settle',
+                  icon: Icons.account_balance_wallet_outlined,
+                  width: double.infinity,
+                  onTap: () => context.push(
+                      '/app/shifts/payment/${_shift!['id']}'),
+                ),
+                const SizedBox(height: 12),
+                AppButton(
+                  label: 'View Readings',
+                  secondary: true,
+                  icon: Icons.visibility_outlined,
+                  width: double.infinity,
+                  onTap: () {
+                    final pumpId = (_shift!['pump'] as Map?)?['id'] as String? ?? '';
+                    if (pumpId.isNotEmpty) {
+                      final user = ref.read(currentUserProvider);
+                      final isWorker = user?.role == 'PUMP_PERSON';
+                      final base = isWorker ? '/worker' : '/app/shifts';
+                      context.push('$base/nozzle/$pumpId');
+                    }
+                  },
+                ),
+              ],
             ],
           )),
     );
@@ -1070,7 +1196,6 @@ class _MyEarningsScreenState extends ConsumerState<MyEarningsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = ref.watch(currentUserProvider);
 
     return Scaffold(
       backgroundColor: AppColors.bgApp,
@@ -1078,7 +1203,7 @@ class _MyEarningsScreenState extends ConsumerState<MyEarningsScreen> {
         title: const Text('My Earnings'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, size: 18),
-          onPressed: () => context.go('/worker'),
+          onPressed: () => context.pop(),
         ),
       ),
       body: _loading

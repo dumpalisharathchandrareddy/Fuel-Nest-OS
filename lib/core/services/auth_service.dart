@@ -38,6 +38,40 @@ class AuthService {
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
 
+  // ── Defensive Storage Helpers ─────────────────────────────────────────────
+  
+  Future<String?> _read(String key) async {
+    try {
+      debugPrint('[AUTH] 🔍 Reading key: $key...');
+      final value = await _storage.read(key: key).timeout(const Duration(seconds: 15));
+      debugPrint('[AUTH] ✅ Read $key: ${value != null ? "FOUND" : "NOT FOUND"}');
+      return value;
+    } catch (e) {
+      debugPrint('[AUTH] ❌ AuthService error reading key $key: $e');
+      return null;
+    }
+  }
+
+  Future<void> _write(String key, String value) async {
+    try {
+      debugPrint('[AUTH] 💾 Writing key: $key...');
+      await _storage.write(key: key, value: value).timeout(const Duration(seconds: 15));
+      debugPrint('[AUTH] ✅ Written $key');
+    } catch (e) {
+      debugPrint('[AUTH] ❌ AuthService error writing key $key: $e');
+    }
+  }
+
+  Future<void> _delete(String key) async {
+    try {
+      debugPrint('[AUTH] 🗑️ Deleting key: $key...');
+      await _storage.delete(key: key).timeout(const Duration(seconds: 15));
+      debugPrint('[AUTH] ✅ Deleted $key');
+    } catch (e) {
+      debugPrint('[AUTH] ❌ AuthService error deleting key $key: $e');
+    }
+  }
+
   AuthUser? _currentUser;
   AuthUser? get currentUser => _currentUser;
   bool get isLoggedIn => _currentUser != null;
@@ -141,38 +175,44 @@ class AuthService {
 
   /// Restore session on app launch
   Future<AuthUser?> restoreSession() async {
-    // Stage 1: Check if tenant is already configured
+    debugPrint('[AUTH] 🔄 Beginning user session restoration...');
+    // Stage 1: Check technical config
     if (!TenantService.instance.isConfigured) {
-      debugPrint('AUTH_RESTORE: Bailing out - no technical tenant configured.');
+      debugPrint('[AUTH] ✋ Bailing: Technical tenant not configured.');
       return null;
     }
 
-    // Stage 2: Try to restore user from secure storage
-    final userJson =
-        await _storage.read(key: '${StorageKeys.userSession}_user');
+    // Stage 2: Restore user JSON from storage
+    final key = '${StorageKeys.userSession}_user';
+    final userJson = await _read(key);
+    
     if (userJson == null) {
-      debugPrint('AUTH_RESTORE: No persisted user session found.');
+      debugPrint('[AUTH] ℹ️ No persisted user JSON found.');
       return null;
     }
 
+    debugPrint('[AUTH] 📂 Found user JSON (len=${userJson.length}). Decoding...');
     final user = AuthUser.fromJsonString(userJson);
     if (user == null) {
-      debugPrint('AUTH_RESTORE: Failed to decode persisted user JSON.');
+      debugPrint('[AUTH] ❌ FAILED to decode user JSON.');
+      await _delete(key); // Clear corrupt data
       return null;
     }
 
-    // Stage 3: Try to restore Supabase auth session (TECHNICAL SYNC)
-    debugPrint('AUTH_RESTORE: Found persisted user ${user.fullName}. Syncing Supabase...');
+    // Stage 3: Sync Supabase tech session
+    debugPrint('[AUTH] 🔗 App user ${user.fullName} found. Syncing Supabase tech session...');
     final syncOk = await TenantService.instance.restoreSession();
 
     if (!syncOk) {
-      debugPrint('AUTH_RESTORE: Technical sync failed (Expired or Invalid). Bailing out.');
-      // Important: We do NOT clear _currentUser here because we want to 
-      // let the caller decide (AuthNotifier will handle clearing state).
+      debugPrint('[AUTH] ⚠️ Supabase sync failed (expired/invalid). Clearing user persistence.');
+      // Keep station config, but clear user-specific data
+      _currentUser = null;
+      await _delete(key);
+      await TenantService.instance.clearUserSession();
       return null;
     }
 
-    debugPrint('AUTH_RESTORE: Technical sync successful.');
+    debugPrint('[AUTH] ✨ Restoration SUCCESS for ${user.fullName}');
     _currentUser = user;
     return user;
   }
@@ -181,13 +221,13 @@ class AuthService {
   Future<void> logout() async {
     _currentUser = null;
     await TenantService.instance.clearTenant();
-    await _storage.delete(key: '${StorageKeys.userSession}_user');
+    await _delete('${StorageKeys.userSession}_user');
   }
 
   Future<void> _persistUser(AuthUser user) async {
-    await _storage.write(
-      key: '${StorageKeys.userSession}_user',
-      value: user.toJsonString(),
+    await _write(
+      '${StorageKeys.userSession}_user',
+      user.toJsonString(),
     );
   }
 }

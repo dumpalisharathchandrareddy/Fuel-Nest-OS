@@ -36,7 +36,7 @@ class _StationCodeScreenState extends ConsumerState<StationCodeScreen> {
     if (!mounted) return;
     final auth = ref.read(authProvider);
     if (auth.error == null && auth.stationConfigured) {
-      context.go('/login');
+      context.push('/login');
     }
   }
 
@@ -102,20 +102,16 @@ class _StationCodeScreenState extends ConsumerState<StationCodeScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
-    final size = MediaQuery.sizeOf(context);
-    final isWide = size.width > 600;
-
     return Scaffold(
       backgroundColor: AppColors.bgApp,
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(
-              horizontal: isWide ? size.width * 0.3 : 24,
-              vertical: 32,
-            ),
-            child: Form(
-              key: _form,
+        child: SingleChildScrollView(
+          child: Center(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 500),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              child: Form(
+                key: _form,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -129,7 +125,7 @@ class _StationCodeScreenState extends ConsumerState<StationCodeScreen> {
                           color: AppColors.blueBg,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                              color: AppColors.blue.withValues(alpha: 0.3)),
+                              color: AppColors.blue.withOpacity(0.3)),
                         ),
                         child: const Icon(Icons.local_gas_station,
                             color: AppColors.blue, size: 22),
@@ -189,7 +185,7 @@ class _StationCodeScreenState extends ConsumerState<StationCodeScreen> {
                         color: AppColors.redBg,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                            color: AppColors.red.withValues(alpha: 0.3)),
+                            color: AppColors.red.withOpacity(0.3)),
                       ),
                       child: Row(
                         children: [
@@ -245,7 +241,7 @@ class _StationCodeScreenState extends ConsumerState<StationCodeScreen> {
                   const SizedBox(height: 16),
                   AppButton(
                     label: 'Register New Station',
-                    onTap: () => context.go('/signup'),
+                    onTap: () => context.push('/signup'),
                     secondary: true,
                     width: double.infinity,
                   ),
@@ -265,7 +261,7 @@ class _StationCodeScreenState extends ConsumerState<StationCodeScreen> {
                   const SizedBox(height: 32),
                   Center(
                     child: TextButton(
-                      onPressed: () => context.go('/creditor'),
+                      onPressed: () => context.push('/creditor'),
                       child: const Text(
                         'Access Creditor Portal →',
                         style: TextStyle(
@@ -285,7 +281,8 @@ class _StationCodeScreenState extends ConsumerState<StationCodeScreen> {
                       ),
                     ),
                   ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

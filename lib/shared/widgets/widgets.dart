@@ -217,6 +217,105 @@ class _AppTextFieldState extends State<AppTextField> {
   }
 }
 
+// ── AppAutocompleteField ──────────────────────────────────────────────────────
+
+class AppAutocompleteField extends StatelessWidget {
+  final String label;
+  final String? hint;
+  final TextEditingController controller;
+  final FocusNode? focusNode;
+  final List<String> suggestions;
+  final String? Function(String?)? validator;
+  final IconData? prefixIcon;
+  final void Function(String)? onSelected;
+
+  const AppAutocompleteField({
+    super.key,
+    required this.label,
+    this.hint,
+    required this.controller,
+    this.focusNode,
+    required this.suggestions,
+    this.validator,
+    this.prefixIcon,
+    this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return RawAutocomplete<String>(
+      textEditingController: controller,
+      focusNode: focusNode,
+      optionsBuilder: (textEditingValue) {
+        if (textEditingValue.text.isEmpty) {
+          return const Iterable<String>.empty();
+        }
+        return suggestions.where((option) {
+          return option.toLowerCase().contains(
+                textEditingValue.text.toLowerCase(),
+              );
+        });
+      },
+      onSelected: onSelected,
+      optionsViewBuilder: (context, onSelected, options) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 8,
+            color: AppColors.bgCard,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: const BorderSide(color: AppColors.border),
+            ),
+            child: Container(
+              width: MediaQuery.sizeOf(context).width - 48, // Responsive width
+              constraints: const BoxConstraints(maxHeight: 250),
+              child: ListView.separated(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                itemCount: options.length,
+                separatorBuilder: (_, __) =>
+                    const Divider(height: 1, color: AppColors.border),
+                itemBuilder: (context, index) {
+                  final option = options.elementAt(index);
+                  return InkWell(
+                    onTap: () => onSelected(option),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      child: Text(
+                        option,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+      fieldViewBuilder: (context, ctrl, focusNode, onFieldSubmitted) {
+        return AppTextField(
+          label: label,
+          hint: hint,
+          controller: ctrl,
+          focusNode: focusNode,
+          prefixIcon: prefixIcon,
+          validator: validator,
+          onSubmitted: (v) => onFieldSubmitted(),
+          textCapitalization: TextCapitalization.words,
+        );
+      },
+    );
+  }
+}
+
 // ── StatusBadge ───────────────────────────────────────────────────────────────
 
 enum BadgeTone { neutral, success, warning, error, info, purple }

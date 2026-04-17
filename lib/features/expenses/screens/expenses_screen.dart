@@ -429,7 +429,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                                                     height: 38,
                                                     decoration: BoxDecoration(
                                                         color: catData.$4
-                                                            .withValues(alpha: 0.12),
+                                                            .withOpacity(0.12),
                                                         borderRadius:
                                                             BorderRadius
                                                                 .circular(10)),
@@ -715,7 +715,7 @@ class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                   decoration: BoxDecoration(
-                      color: sel ? color.withValues(alpha: 0.15) : AppColors.bgCard,
+                      color: sel ? color.withOpacity(0.15) : AppColors.bgCard,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                           color: sel ? color : AppColors.border,

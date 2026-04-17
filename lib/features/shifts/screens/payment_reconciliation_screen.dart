@@ -25,8 +25,12 @@ class _PaymentReconciliationScreenState
   bool _submitting = false;
   String? _error;
   Map<String, dynamic>? _shift;
-  List<dynamic> _paymentRecords = [];
-  final Map<String, TextEditingController> _amountControllers = {};
+  Map<String, dynamic>? _paymentRecord;
+  final _upiCtrl = TextEditingController(text: '0');
+  final _cardCtrl = TextEditingController(text: '0');
+  final _creditCtrl = TextEditingController(text: '0');
+  final _actualCashCtrl = TextEditingController(text: '0');
+  final _noteCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -36,7 +40,11 @@ class _PaymentReconciliationScreenState
 
   @override
   void dispose() {
-    for (final c in _amountControllers.values) c.dispose();
+    _upiCtrl.dispose();
+    _cardCtrl.dispose();
+    _creditCtrl.dispose();
+    _actualCashCtrl.dispose();
+    _noteCtrl.dispose();
     super.dispose();
   }
 
@@ -58,17 +66,15 @@ class _PaymentReconciliationScreenState
       // Display as single structured record with UPI/cash/card amounts
       final pr = shift['payment_record'] as Map<String, dynamic>?;
       if (pr != null) {
-        final prId = pr['id'] as String;
-        _amountControllers[prId] = TextEditingController(
-          text: (pr['actual_cash_collected_amount'] ?? pr['cash_to_collect'])
-                  ?.toString() ??
-              '0',
-        );
+        _upiCtrl.text = pr['upi_amount']?.toString() ?? '0';
+        _cardCtrl.text = pr['card_amount']?.toString() ?? '0';
+        _creditCtrl.text = pr['credit_amount']?.toString() ?? '0';
+        _actualCashCtrl.text = (pr['actual_cash_collected_amount'] ?? pr['cash_to_collect'] ?? 0).toString();
       }
 
       setState(() {
         _shift = shift;
-        _paymentRecords = pr != null ? [pr] : [];
+        _paymentRecord = pr;
         _loading = false;
       });
     } catch (e) {
@@ -80,10 +86,9 @@ class _PaymentReconciliationScreenState
   }
 
   double get _totalSale {
-    final pr = _shift?['payment_record'] as Map?;
-    if (pr != null)
-      return double.tryParse(pr['total_sale_amount']?.toString() ?? '0') ?? 0;
-    // Fallback: sum nozzle entries
+    if (_paymentRecord != null) {
+      return double.tryParse(_paymentRecord!['total_sale_amount']?.toString() ?? '0') ?? 0;
+    }
     return (_shift?['nozzle_entries'] as List? ?? []).fold<double>(
         0,
         (s, e) =>
@@ -92,19 +97,30 @@ class _PaymentReconciliationScreenState
                 0));
   }
 
-  double get _totalCollected => _amountControllers.values
-      .fold(0, (sum, c) => sum + (double.tryParse(c.text) ?? 0));
+  double get _upi => double.tryParse(_upiCtrl.text) ?? 0;
+  double get _card => double.tryParse(_cardCtrl.text) ?? 0;
+  double get _credit => double.tryParse(_creditCtrl.text) ?? 0;
+  double get _actualCash => double.tryParse(_actualCashCtrl.text) ?? 0;
 
+  double get _expectedCash => _totalSale - (_upi + _card + _credit);
+  double get _totalCollected => _upi + _card + _credit + _actualCash;
   double get _difference => _totalCollected - _totalSale;
 
   Future<void> _settle() async {
+    if (_difference.abs() > 1 && _noteCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please provide a note for the mismatch')),
+      );
+      return;
+    }
+
     final confirmed = await showConfirmDialog(
       context,
       title: 'Settle Shift',
       message:
           'This will mark the shift as settled. Difference: ${IndianCurrency.format(_difference)}. Continue?',
       confirmLabel: 'Settle',
-      isDanger: _difference.abs() > 100,
+      isDanger: _difference.abs() > 10,
     );
     if (!confirmed) return;
 
@@ -113,20 +129,24 @@ class _PaymentReconciliationScreenState
       final db = TenantService.instance.client;
       final stationName = ref.read(stationNameProvider);
 
-      // Update payment record with actual cash collected and mark balanced
-      for (final p in _paymentRecords) {
-        final key = p['id'] as String;
-        final amount =
-            double.tryParse(_amountControllers[key]?.text ?? '0') ?? 0;
+      if (_paymentRecord != null) {
         await db.from('PaymentRecord').update({
-          'actual_cash_collected_amount': amount,
+          'upi_amount': _upi,
+          'card_amount': _card,
+          'credit_amount': _credit,
+          'cash_to_collect': _expectedCash,
+          'actual_cash_collected_amount': _actualCash,
+          'total_sale_amount': _totalSale,
           'is_balanced': _difference.abs() < 1,
-        }).eq('id', key);
+          'mismatch_amount': _difference,
+          'mismatch_resolution_note': _noteCtrl.text.trim().isNotEmpty ? _noteCtrl.text.trim() : null,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        }).eq('id', _paymentRecord!['id']);
       }
 
       // Close the shift
       await db.from('Shift').update({
-        'status': 'SETTLED',
+        'status': 'CLOSED',
         'closed_at': DateTime.now().toUtc().toIso8601String(),
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }).eq('id', widget.shiftId);
@@ -149,7 +169,7 @@ class _PaymentReconciliationScreenState
             backgroundColor: AppColors.green,
           ),
         );
-        context.go('/app/shifts');
+        if (mounted) context.pop();
       }
     } catch (e) {
       if (mounted) {
@@ -173,7 +193,7 @@ class _PaymentReconciliationScreenState
         (_shift!['assigned_worker'] as Map?)?['full_name'] as String? ??
             'Unassigned';
     final status = _shift!['status'] as String? ?? '';
-    final isSettled = status == 'SETTLED';
+    final isSettled = status == 'CLOSED' || status == 'SETTLED';
 
     return Scaffold(
       backgroundColor: AppColors.bgApp,
@@ -181,7 +201,7 @@ class _PaymentReconciliationScreenState
         title: Text('Reconcile — $pumpName'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, size: 18),
-          onPressed: () => context.go('/app/shifts'),
+          onPressed: () => context.pop(),
         ),
       ),
       body: Column(
@@ -253,79 +273,99 @@ class _PaymentReconciliationScreenState
                 }),
 
                 const SizedBox(height: 16),
-                const SectionHeader(title: 'Payment Collection'),
+                const SectionHeader(title: 'Payment Details'),
                 const SizedBox(height: 12),
 
-                // Payment method inputs
-                ..._paymentRecords.map((p) {
-                  final key = p['id'] as String;
-                  final method = p['payment_mode'] as String? ?? '';
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: Text(method,
-                              style: const TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontWeight: FontWeight.w500)),
-                        ),
-                        Expanded(
-                          flex: 3,
-                          child: TextFormField(
-                            controller: _amountControllers[key],
-                            enabled: !isSettled,
-                            keyboardType: const TextInputType.numberWithOptions(
-                                decimal: true),
-                            textAlign: TextAlign.right,
-                            onChanged: (_) => setState(() {}),
-                            style: const TextStyle(
-                                color: AppColors.textPrimary, fontSize: 14),
-                            decoration: InputDecoration(
-                              prefixText: '₹ ',
-                              prefixStyle:
-                                  const TextStyle(color: AppColors.textMuted),
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(
-                                      color: AppColors.border)),
-                              enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(
-                                      color: AppColors.border)),
-                              focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(
-                                      color: AppColors.blue, width: 1.5)),
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 10),
-                              filled: true,
-                              fillColor: AppColors.bgCard,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
+                AppCard(
+                  child: Column(
+                    children: [
+                      _PaymentInput(
+                        label: 'UPI Amount',
+                        controller: _upiCtrl,
+                        enabled: !isSettled,
+                        onChanged: (_) => setState(() {}),
+                      ),
+                      const Divider(height: 24, color: AppColors.border),
+                      _PaymentInput(
+                        label: 'Card Amount',
+                        controller: _cardCtrl,
+                        enabled: !isSettled,
+                        onChanged: (_) => setState(() {}),
+                      ),
+                      const Divider(height: 24, color: AppColors.border),
+                      _PaymentInput(
+                        label: 'Credit Amount',
+                        controller: _creditCtrl,
+                        enabled: !isSettled,
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ],
+                  ),
+                ),
 
-                // Totals
-                const SizedBox(height: 8),
+                const SizedBox(height: 20),
+                const SectionHeader(title: 'Cash Reconciliation'),
+                const SizedBox(height: 12),
+
+                AppCard(
+                  child: Column(
+                    children: [
+                      _InfoRow('Total Sales', IndianCurrency.format(_totalSale)),
+                      _InfoRow('Non-Cash Total', IndianCurrency.format(_upi + _card + _credit)),
+                      const Divider(height: 24, color: AppColors.border),
+                      _InfoRow(
+                        'Expected Cash',
+                        IndianCurrency.format(_expectedCash),
+                        valueStyle: const TextStyle(
+                          color: AppColors.blue,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'ACTUAL CASH COLLECTED',
+                        style: TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _actualCashCtrl,
+                        enabled: !isSettled,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        textAlign: TextAlign.center,
+                        onChanged: (_) => setState(() {}),
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        decoration: InputDecoration(
+                          prefixText: '₹ ',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          filled: true,
+                          fillColor: AppColors.bgSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
                 AppCard(
                   borderColor: _difference.abs() < 1
                       ? AppColors.green.withValues(alpha: 0.3)
-                      : AppColors.amber.withValues(alpha: 0.3),
+                      : AppColors.red.withValues(alpha: 0.3),
                   child: Column(
                     children: [
-                      _InfoRow('Total Sale', IndianCurrency.format(_totalSale)),
-                      _InfoRow('Total Collected',
-                          IndianCurrency.format(_totalCollected)),
-                      const Divider(color: AppColors.border, height: 16),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Difference',
+                          const Text('Final Mismatch',
                               style: TextStyle(
                                   color: AppColors.textPrimary,
                                   fontWeight: FontWeight.w700)),
@@ -334,13 +374,39 @@ class _PaymentReconciliationScreenState
                             style: TextStyle(
                               color: _difference.abs() < 1
                                   ? AppColors.green
-                                  : AppColors.amber,
+                                  : AppColors.red,
                               fontWeight: FontWeight.w800,
-                              fontSize: 16,
+                              fontSize: 18,
                             ),
                           ),
                         ],
                       ),
+                      if (_difference.abs() > 1) ...[
+                        const SizedBox(height: 16),
+                        const Divider(height: 1, color: AppColors.border),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'MISMATCH RESOLUTION NOTE',
+                          style: TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _noteCtrl,
+                          enabled: !isSettled,
+                          maxLines: 2,
+                          decoration: InputDecoration(
+                            hintText: 'Explain the difference (mandatory)',
+                            hintStyle: const TextStyle(fontSize: 12),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                            filled: true,
+                            fillColor: AppColors.bgSurface,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -370,12 +436,13 @@ class _PaymentReconciliationScreenState
 class _InfoRow extends StatelessWidget {
   final String label;
   final String value;
-  const _InfoRow(this.label, this.value);
+  final TextStyle? valueStyle;
+  const _InfoRow(this.label, this.value, {this.valueStyle});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -383,12 +450,62 @@ class _InfoRow extends StatelessWidget {
               style: const TextStyle(
                   color: AppColors.textSecondary, fontSize: 13)),
           Text(value,
-              style: const TextStyle(
+              style: valueStyle ?? const TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 13,
                   fontWeight: FontWeight.w500)),
         ],
       ),
+    );
+  }
+}
+
+class _PaymentInput extends StatelessWidget {
+  final String label;
+  final TextEditingController controller;
+  final bool enabled;
+  final ValueChanged<String>? onChanged;
+
+  const _PaymentInput({
+    required this.label,
+    required this.controller,
+    required this.enabled,
+    this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          flex: 2,
+          child: Text(label,
+              style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13)),
+        ),
+        Expanded(
+          flex: 3,
+          child: TextFormField(
+            controller: controller,
+            enabled: enabled,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            textAlign: TextAlign.right,
+            onChanged: onChanged,
+            style: const TextStyle(
+                color: AppColors.textPrimary, 
+                fontSize: 14,
+                fontWeight: FontWeight.w700),
+            decoration: InputDecoration(
+              prefixText: '₹ ',
+              prefixStyle: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              border: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.border)),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

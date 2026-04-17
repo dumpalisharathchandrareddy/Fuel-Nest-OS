@@ -91,7 +91,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         db
             .from('Shift')
             .select(
-                'id, status, pump:Pump(name), assigned_worker:User(full_name), nozzle_entries:NozzleEntry(sale_amount)')
+                'id, status, pump:Pump(id, name), assigned_worker:User(full_name), nozzle_entries:NozzleEntry(sale_amount)')
             .eq('station_id', user.stationId)
             .eq('status', 'OPEN'),
         db
@@ -150,10 +150,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       final transactions = results[8] as List;
 
       final tankStocks = <String, double>{};
-      for (final t in tanks) {
+      for (final tRaw in tanks) {
+        final t = Map<String, dynamic>.from(tRaw as Map);
         final tid = t['id'] as String;
         double stock = initialStocks[tid] ?? 0.0;
-        for (final tx in transactions) {
+        for (final txRaw in transactions) {
+          final tx = Map<String, dynamic>.from(txRaw as Map);
           if (tx['tank_id'] == tid) {
             stock += double.tryParse(tx['quantity']?.toString() ?? '0') ?? 0;
           }
@@ -161,22 +163,26 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         tankStocks[tid] = stock;
       }
       final tanksWithStock = tanks
-          .map((t) => {...t, 'computed_stock': tankStocks[t['id']] ?? 0.0})
+          .map((tRaw) {
+            final t = Map<String, dynamic>.from(tRaw as Map);
+            return {...t, 'computed_stock': tankStocks[t['id']] ?? 0.0};
+          })
           .toList();
 
-      final todayRevenue = todayShifts.fold<double>(0, (sum, s) {
+      final todayRevenue = todayShifts.fold<double>(0, (sum, sRaw) {
+        final s = Map<String, dynamic>.from(sRaw as Map);
         final entries = (s['nozzle_entries'] as List? ?? []);
         return sum +
             entries.fold<double>(
                 0,
-                (es, e) =>
-                    es +
-                    (double.tryParse(
-                            (e as Map)['sale_amount']?.toString() ?? '0') ??
-                        0));
+                (es, eRaw) {
+                  final e = Map<String, dynamic>.from(eRaw as Map);
+                  return es + (double.tryParse(e['sale_amount']?.toString() ?? '0') ?? 0);
+                });
       });
 
-      final lowTanks = tanksWithStock.where((t) {
+      final lowTanks = tanksWithStock.where((tRaw) {
+        final t = Map<String, dynamic>.from(tRaw as Map);
         final cur = (t['computed_stock'] as double?) ?? 0;
         final reorder =
             double.tryParse(t['low_stock_threshold']?.toString() ?? '0') ?? 0;
@@ -194,8 +200,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           'lowTanks': lowTanks,
           'staff': staff,
           'pumps': pumps,
-          'managers': staff.where((s) => s['role'] == 'MANAGER').length,
-          'workers': staff.where((s) => s['role'] == 'PUMP_PERSON').length,
+          'managers': staff.where((s) => (s as Map)['role'] == 'MANAGER').length,
+          'workers': staff.where((s) => (s as Map)['role'] == 'PUMP_PERSON').length,
         };
         _loading = false;
       });
@@ -271,14 +277,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       message:
                           '⚠️ ${d['lowStockAlerts']} tank(s) below reorder level',
                       color: AppColors.amber,
-                      onTap: () => context.go('/app/inventory'),
+                      onTap: () => context.push('/app/inventory'),
                     ),
                   if ((d['pendingSettlements'] as int) > 0)
                     _AlertBanner(
                       message:
                           '${d['pendingSettlements']} shift(s) pending settlement',
                       color: AppColors.blue,
-                      onTap: () => context.go('/app/shifts'),
+                      onTap: () => context.push('/app/shifts'),
                     ),
                 ],
               ),
@@ -300,21 +306,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   amount: d['todayRevenue'] as double,
                   icon: Icons.trending_up,
                   color: AppColors.green,
-                  onTap: () => context.go('/app/reports'),
+                  onTap: () => context.push('/app/reports'),
                 ),
                 KpiCard(
                   label: 'Active Shifts',
                   value: '${activeShifts.length}',
                   icon: Icons.swap_horiz,
                   color: AppColors.blue,
-                  onTap: () => context.go('/app/shifts'),
+                  onTap: () => context.push('/app/shifts'),
                 ),
                 KpiCard(
                   label: 'Pending Settlement',
                   value: '${d['pendingSettlements']}',
                   icon: Icons.pending_actions,
                   color: AppColors.amber,
-                  onTap: () => context.go('/app/shifts'),
+                  onTap: () => context.push('/app/shifts'),
                 ),
                 KpiCard(
                   label: 'Low Stock Alerts',
@@ -323,7 +329,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   color: (d['lowStockAlerts'] as int) > 0
                       ? AppColors.red
                       : AppColors.textMuted,
-                  onTap: () => context.go('/app/inventory'),
+                  onTap: () => context.push('/app/inventory'),
                 ),
               ]),
             ),
@@ -339,13 +345,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     SectionHeader(
                       title: 'Active Shifts',
                       action: 'View All',
-                      onAction: () => context.go('/app/shifts'),
+                      onAction: () => context.push('/app/shifts'),
                     ),
                     const SizedBox(height: 12),
-                    ...activeShifts.take(3).map((s) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _ActiveShiftCard(shift: s),
-                        )),
+                    ...activeShifts.take(3).map((sRaw) {
+                          final s = Map<String, dynamic>.from(sRaw as Map);
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _ActiveShiftCard(
+                              shift: s,
+                              onTap: () {
+                                final pumpId = (s['pump'] as Map?)?['id'] as String? ?? '';
+                                final role = user?.role ?? '';
+                                if (pumpId.isNotEmpty) {
+                                  if (role == 'PUMP_PERSON') {
+                                    context.push('/worker/nozzle/$pumpId');
+                                  } else {
+                                    context.push('/app/shifts/execution/${s['id']}');
+                                  }
+                                }
+                              },
+                            ),
+                          );
+                        }),
                   ],
                 ),
               ),
@@ -357,7 +379,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               child: SectionHeader(
                 title: 'Tank Status',
                 action: 'Inventory',
-                onAction: () => context.go('/app/inventory'),
+                onAction: () => context.push('/app/inventory'),
               ),
             ),
           ),
@@ -378,10 +400,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
-                  (_, i) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _TankCard(tank: (d['tanks'] as List)[i]),
-                  ),
+                  (_, i) {
+                    final tankRaw = (d['tanks'] as List)[i];
+                    final tank = Map<String, dynamic>.from(tankRaw as Map);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _TankCard(tank: tank),
+                    );
+                  },
                   childCount: ((d['tanks'] as List)).length,
                 ),
               ),
@@ -406,7 +432,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                     const Spacer(),
                     TextButton(
-                      onPressed: () => context.go('/app/staff'),
+                      onPressed: () => context.push('/app/staff'),
                       child: const Text('Manage →'),
                     ),
                   ],
@@ -466,7 +492,8 @@ class _AlertBanner extends StatelessWidget {
 
 class _ActiveShiftCard extends StatelessWidget {
   final Map<String, dynamic> shift;
-  const _ActiveShiftCard({required this.shift});
+  final VoidCallback onTap;
+  const _ActiveShiftCard({required this.shift, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -482,6 +509,7 @@ class _ActiveShiftCard extends StatelessWidget {
                 0));
 
     return AppCard(
+      onTap: onTap,
       borderColor: AppColors.green.withValues(alpha: 0.2),
       child: Row(
         children: [

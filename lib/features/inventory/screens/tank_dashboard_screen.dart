@@ -207,7 +207,7 @@ class _TankDashboardScreenState extends ConsumerState<TankDashboardScreen> {
             children: [
               FloatingActionButton.extended(
                 heroTag: 'order',
-                onPressed: () => context.go('/app/inventory/order'),
+                onPressed: () => context.push('/app/inventory/order'),
                 label: const Text('Order Fuel'),
                 icon: const Icon(Icons.add),
                 backgroundColor: AppColors.blue,
@@ -215,7 +215,7 @@ class _TankDashboardScreenState extends ConsumerState<TankDashboardScreen> {
               const SizedBox(height: 8),
               FloatingActionButton.extended(
                 heroTag: 'dip',
-                onPressed: () => context.go('/app/inventory/dip'),
+                onPressed: () => context.push('/app/inventory/dip'),
                 label: const Text('Dip Reading'),
                 icon: const Icon(Icons.straighten),
                 backgroundColor: AppColors.bgCard,
@@ -224,7 +224,7 @@ class _TankDashboardScreenState extends ConsumerState<TankDashboardScreen> {
               const SizedBox(height: 8),
               FloatingActionButton.extended(
                 heroTag: 'cheque',
-                onPressed: () => context.go('/app/inventory/cheque'),
+                onPressed: () => context.push('/app/inventory/cheque'),
                 label: const Text('Add Cheque'),
                 icon: const Icon(Icons.receipt),
                 backgroundColor: AppColors.bgCard,
@@ -255,7 +255,7 @@ class _TankDashboardScreenState extends ConsumerState<TankDashboardScreen> {
               SectionHeader(
                   title: 'Recent Orders',
                   action: '+ New',
-                  onAction: () => context.go('/app/inventory/order')),
+                  onAction: () => context.push('/app/inventory/order')),
               const SizedBox(height: 12),
               if (_orders.isEmpty)
                 const EmptyView(
@@ -300,7 +300,7 @@ class _TankDashboardScreenState extends ConsumerState<TankDashboardScreen> {
               SectionHeader(
                   title: 'Cheques',
                   action: '+ New',
-                  onAction: () => context.go('/app/inventory/cheque')),
+                  onAction: () => context.push('/app/inventory/cheque')),
               const SizedBox(height: 12),
               if (_cheques.isEmpty)
                 const EmptyView(
@@ -367,7 +367,7 @@ class _TankCard extends StatelessWidget {
     };
 
     return AppCard(
-      borderColor: isLow ? AppColors.red.withValues(alpha: 0.3) : null,
+      borderColor: isLow ? AppColors.red.withOpacity(0.3) : null,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Expanded(
@@ -519,7 +519,7 @@ class _FuelOrderScreenState extends ConsumerState<FuelOrderScreen> {
           stationName: stationName);
 
       if (mounted) {
-        context.go('/app/inventory');
+        context.pop();
       }
     } catch (e) {
       setState(() {
@@ -540,7 +540,7 @@ class _FuelOrderScreenState extends ConsumerState<FuelOrderScreen> {
           title: const Text('Fuel Order'),
           leading: IconButton(
               icon: const Icon(Icons.arrow_back_ios, size: 18),
-              onPressed: () => context.go('/app/inventory'))),
+              onPressed: () => context.pop())),
       body: Form(
           key: _form,
           child: ListView(padding: const EdgeInsets.all(20), children: [
@@ -685,7 +685,7 @@ class _ChequeEntryScreenState extends ConsumerState<ChequeEntryScreen> {
         'created_by_id': user.id,
         'created_at': DateTime.now().toUtc().toIso8601String(),
       });
-      if (mounted) context.go('/app/inventory');
+      if (mounted) context.pop();
     } catch (e) {
       setState(() {
         _error = e.toString();
@@ -701,7 +701,7 @@ class _ChequeEntryScreenState extends ConsumerState<ChequeEntryScreen> {
             title: const Text('Add Cheque'),
             leading: IconButton(
                 icon: const Icon(Icons.arrow_back_ios, size: 18),
-                onPressed: () => context.go('/app/inventory'))),
+                onPressed: () => context.pop())),
         body: Form(
             key: _form,
             child: ListView(padding: const EdgeInsets.all(20), children: [
@@ -854,7 +854,7 @@ class _DipReadingScreenState extends ConsumerState<DipReadingScreen> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('✅ Dip readings saved'),
             backgroundColor: AppColors.green));
-        context.go('/app/inventory');
+        context.pop();
       }
     } catch (e) {
       if (mounted) {
@@ -873,7 +873,7 @@ class _DipReadingScreenState extends ConsumerState<DipReadingScreen> {
             title: const Text('Dip Reading'),
             leading: IconButton(
                 icon: const Icon(Icons.arrow_back_ios, size: 18),
-                onPressed: () => context.go('/app/inventory'))),
+                onPressed: () => context.pop())),
         body: _loading
             ? const LoadingView()
             : Column(children: [

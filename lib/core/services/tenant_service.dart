@@ -15,6 +15,50 @@ class TenantService {
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
 
+  // ── Defensive Storage Helpers ─────────────────────────────────────────────
+  
+  Future<String?> _read(String key) async {
+    try {
+      debugPrint('[TENANT] 🔍 Reading key: $key...');
+      final value = await _storage.read(key: key).timeout(const Duration(seconds: 15));
+      debugPrint('[TENANT] ✅ Read $key: ${value != null ? "FOUND" : "NOT FOUND"}');
+      return value;
+    } catch (e) {
+      debugPrint('[TENANT] ❌ Error reading key $key: $e');
+      return null;
+    }
+  }
+
+  Future<void> _write(String key, String value) async {
+    try {
+      debugPrint('[TENANT] 💾 Writing key: $key...');
+      await _storage.write(key: key, value: value).timeout(const Duration(seconds: 15));
+      debugPrint('[TENANT] ✅ Written $key');
+    } catch (e) {
+      debugPrint('[TENANT] ❌ Error writing key $key: $e');
+    }
+  }
+
+  Future<void> _delete(String key) async {
+    try {
+      debugPrint('[TENANT] 🗑️ Deleting key: $key...');
+      await _storage.delete(key: key).timeout(const Duration(seconds: 15));
+      debugPrint('[TENANT] ✅ Deleted $key');
+    } catch (e) {
+      debugPrint('[TENANT] ❌ Error deleting key $key: $e');
+    }
+  }
+
+  Future<void> _deleteAll() async {
+    try {
+      debugPrint('[TENANT] 🧹 Clearing all storage...');
+      await _storage.deleteAll().timeout(const Duration(seconds: 15));
+      debugPrint('[TENANT] ✅ Storage cleared');
+    } catch (e) {
+      debugPrint('[TENANT] ❌ Error clearing storage: $e');
+    }
+  }
+
   SupabaseClient? _tenantClient;
   StationRegistryEntry? _currentStation;
 
@@ -36,10 +80,10 @@ class TenantService {
   /// Called after station code lookup succeeds.
   Future<void> configure(StationRegistryEntry entry) async {
     // Store securely for next app launch
-    await _storage.write(key: StorageKeys.tenantUrl, value: entry.supabaseUrl);
-    await _storage.write(key: StorageKeys.tenantAnonKey, value: entry.anonKey);
-    await _storage.write(key: StorageKeys.stationCode, value: entry.stationCode);
-    await _storage.write(key: StorageKeys.stationName, value: entry.stationName);
+    await _write(StorageKeys.tenantUrl, entry.supabaseUrl);
+    await _write(StorageKeys.tenantAnonKey, entry.anonKey);
+    await _write(StorageKeys.stationCode, entry.stationCode);
+    await _write(StorageKeys.stationName, entry.stationName);
 
     _currentStation = entry;
     _tenantClient = SupabaseClient(entry.supabaseUrl, entry.anonKey);
@@ -62,18 +106,20 @@ class TenantService {
   /// Restore tenant connection from secure storage on app launch.
   /// Returns the stored station code if found.
   Future<String?> restoreFromStorage() async {
-    final url = await _storage.read(key: StorageKeys.tenantUrl);
-    final anonKey = await _storage.read(key: StorageKeys.tenantAnonKey);
-    final stationCode = await _storage.read(key: StorageKeys.stationCode);
-    final stationName = await _storage.read(key: StorageKeys.stationName);
+    debugPrint('[TENANT] 🔄 Beginning technical restoration...');
+    final url = await _read(StorageKeys.tenantUrl);
+    final anonKey = await _read(StorageKeys.tenantAnonKey);
+    final stationCode = await _read(StorageKeys.stationCode);
+    final stationName = await _read(StorageKeys.stationName);
 
-    debugPrint('TENANT_RESTORE: url=${url != null}, key=${anonKey != null}, code=$stationCode');
+    debugPrint('[TENANT] 📊 Probe results: URL=${url != null}, Key=${anonKey != null}, Code=$stationCode, Name=${stationName != null}');
 
     if (url == null || anonKey == null || stationCode == null) {
       if (url != null || anonKey != null || stationCode != null) {
-        debugPrint('TENANT_RESTORE: Partial config found; triggering full reset for safety.');
+        debugPrint('[TENANT] ⚠️ Partial station config found. Triggering technical reset.');
         await fullReset();
       }
+      debugPrint('[TENANT] 🏁 Restoration complete: No valid station found.');
       return null;
     }
 
@@ -85,7 +131,7 @@ class TenantService {
       anonKey: anonKey,
     );
 
-    debugPrint('TENANT_RESTORE: Successfully re-initialized station $stationCode');
+    debugPrint('[AUTH_DEBUG] Technical restoration success for station $stationCode');
     return stationCode;
   }
 
@@ -94,10 +140,7 @@ class TenantService {
   /// endpoint and returns a full session — avoids the partial-JSON crash
   /// that recoverSession causes when the user object shape is wrong.
   Future<void> setSession(String accessToken, String refreshToken) async {
-    await _storage.write(
-      key: StorageKeys.userSession,
-      value: refreshToken,
-    );
+    await _write(StorageKeys.userSession, refreshToken);
     try {
       await client.auth.setSession(refreshToken);
     } catch (_) {
@@ -108,21 +151,24 @@ class TenantService {
 
   /// Restore the saved session on app resume.
   Future<bool> restoreSession() async {
-    final saved = await _storage.read(key: StorageKeys.userSession);
+    final saved = await _read(StorageKeys.userSession);
     if (saved == null) {
-      debugPrint('TENANT_RESTORE: No session token found in storage.');
+      debugPrint('[AUTH_DEBUG] restoreSession: No refresh token found in storage.');
       return false;
     }
+    
+    debugPrint('[AUTH_DEBUG] restoreSession: Found token (len=${saved.length}). Attempting Supabase setSession...');
+    
     try {
       final response = await client.auth
           .setSession(saved)
           .timeout(const Duration(seconds: 10));
       
       final hasSession = response.session != null;
-      debugPrint('TENANT_RESTORE: Supabase setSession completed. hasSession=$hasSession');
+      debugPrint('[AUTH_DEBUG] restoreSession: Supabase response received. SessionPresent=$hasSession');
       return hasSession;
     } catch (e) {
-      debugPrint('TENANT_RESTORE: setSession failed error=$e');
+      debugPrint('[AUTH_DEBUG] restoreSession: Sync failed with error: $e');
       return false;
     }
   }
@@ -132,16 +178,21 @@ class TenantService {
     try {
       await _tenantClient?.auth.signOut();
     } catch (_) {}
-    // We KEEP _tenantClient and _currentStation in memory
-    // so the station remains "configured" for the next login
-    await _storage.delete(key: StorageKeys.userSession);
+    await clearUserSession();
+  }
+
+  /// Explicitly clear ONLY the user-level session data (tokens).
+  /// Preserves station configuration.
+  Future<void> clearUserSession() async {
+    debugPrint('[AUTH_DEBUG] clearUserSession: Removing refresh token from storage.');
+    await _delete(StorageKeys.userSession);
   }
 
   /// Full reset - clear everything including station code.
   Future<void> fullReset() async {
     debugPrint('TENANT_RESET: Performing full cleanup of station and session data.');
     await clearTenant();
-    await _storage.deleteAll();
+    await _deleteAll();
     _tenantClient = null;
     _currentStation = null;
   }

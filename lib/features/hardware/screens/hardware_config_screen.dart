@@ -508,7 +508,7 @@ class _FuelRateScreenState extends ConsumerState<FuelRateScreen> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                        color: fuelColor.withValues(alpha: 0.12),
+                        color: fuelColor.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(10)),
                     alignment: Alignment.center,
                     child: Icon(Icons.local_gas_station,
@@ -698,7 +698,7 @@ class _TankFormSheetState extends ConsumerState<TankFormSheet> {
                   label: Text(type),
                   selected: sel,
                   onSelected: (s) => setState(() => fuelType = type),
-                  selectedColor: AppColors.blue.withValues(alpha: 0.1),
+                  selectedColor: AppColors.blue.withOpacity(0.1),
                   labelStyle: TextStyle(
                       color: sel ? AppColors.blue : AppColors.textSecondary,
                       fontSize: 13,
@@ -1103,7 +1103,7 @@ class _NozzleFormSheetState extends ConsumerState<NozzleFormSheet> {
                   label: Text(type),
                   selected: sel,
                   onSelected: (s) => setState(() => fuelType = type),
-                  selectedColor: AppColors.blue.withValues(alpha: 0.1),
+                  selectedColor: AppColors.blue.withOpacity(0.1),
                   labelStyle: TextStyle(
                       color: sel ? AppColors.blue : AppColors.textSecondary,
                       fontSize: 13,
@@ -1118,7 +1118,7 @@ class _NozzleFormSheetState extends ConsumerState<NozzleFormSheet> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                    color: AppColors.amber.withValues(alpha: 0.1),
+                    color: AppColors.amber.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8)),
                 child: const Row(children: [
                   Icon(Icons.warning_amber, color: AppColors.amber, size: 16),

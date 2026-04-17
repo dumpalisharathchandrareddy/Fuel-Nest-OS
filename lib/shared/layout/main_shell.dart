@@ -113,6 +113,28 @@ class MainShell extends ConsumerStatefulWidget {
   final GoRouterState state;
   const MainShell({super.key, required this.child, required this.state});
 
+  static bool isPathActive(String itemPath, String currentPath) {
+    if (itemPath == currentPath) return true;
+    
+    // Split paths into segments to avoid partial word matches (e.g. /app/staff and /app/staff-new)
+    final itemSegments = itemPath.split('/').where((s) => s.isNotEmpty).toList();
+    final currentSegments = currentPath.split('/').where((s) => s.isNotEmpty).toList();
+
+    if (itemSegments.length > currentSegments.length) return false;
+
+    for (int i = 0; i < itemSegments.length; i++) {
+      if (itemSegments[i] != currentSegments[i]) return false;
+    }
+
+    // Special case: /app/dashboard should ONLY highlight if it is the exact root
+    // otherwise it will match every single /app/... route.
+    if (itemPath == '/app/dashboard') {
+      return currentPath == '/app/dashboard';
+    }
+
+    return true;
+  }
+
   @override
   ConsumerState<MainShell> createState() => _MainShellState();
 }
@@ -162,14 +184,14 @@ class _MainShellState extends ConsumerState<MainShell> {
     final user = ref.watch(currentUserProvider);
     final visibleItems =
         _navItems.where((i) => i.visibleFor(user?.role)).toList();
-    final selectedIdx = visibleItems.indexWhere((i) => i.path == loc);
+    final selectedIdx = visibleItems.indexWhere((i) => MainShell.isPathActive(i.path, loc));
 
     return Scaffold(
       backgroundColor: AppColors.bgApp,
       body: Row(
         children: [
           NavigationRail(
-            selectedIndex: selectedIdx < 0 ? 0 : selectedIdx,
+            selectedIndex: selectedIdx < 0 ? null : selectedIdx,
             onDestinationSelected: (i) => context.go(visibleItems[i].path),
             labelType: NavigationRailLabelType.selected,
             destinations: visibleItems
@@ -201,7 +223,7 @@ class _MainShellState extends ConsumerState<MainShell> {
         .where((i) =>
             _bottomNavPaths.contains(i.path) && i.visibleFor(user?.role))
         .toList();
-    final selectedIdx = bottomItems.indexWhere((i) => i.path == loc);
+    final selectedIdx = bottomItems.indexWhere((i) => MainShell.isPathActive(i.path, loc));
 
     return Scaffold(
       backgroundColor: AppColors.bgApp,
@@ -307,7 +329,8 @@ class _Sidebar extends ConsumerWidget {
               children: _navItems
                   .where((item) => item.visibleFor(user?.role))
                   .map((item) {
-                final active = loc == item.path;
+                final active = MainShell.isPathActive(item.path, loc);
+                
                 return _SidebarItem(
                   item: item,
                   active: active,
@@ -500,7 +523,9 @@ class _MobileAppBar extends ConsumerWidget implements PreferredSizeWidget {
 
   String _title() {
     final item = _navItems.firstWhere(
-      (i) => i.path == currentPath,
+      (i) {
+        return MainShell.isPathActive(i.path, currentPath);
+      },
       orElse: () => _navItems.first,
     );
     return item.label;
@@ -605,7 +630,7 @@ class _MobileDrawer extends ConsumerWidget {
                 children: _navItems
                     .where((item) => item.visibleFor(user?.role))
                     .map((item) {
-                  final active = currentPath == item.path;
+                  final active = MainShell.isPathActive(item.path, currentPath);
                   return ListTile(
                     onTap: () {
                       Navigator.pop(context);
