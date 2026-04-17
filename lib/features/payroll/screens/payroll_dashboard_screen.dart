@@ -33,7 +33,7 @@ class _PayrollDashboardScreenState extends ConsumerState<PayrollDashboardScreen>
       final results = await Future.wait([
         db.from('User').select('id, full_name, role, employee_id').eq('station_id', user.stationId).eq('active', true).neq('role', 'DEALER'),
         db.from('SalaryConfig').select('user_id, base_monthly_salary, effective_from').eq('station_id', user.stationId),
-        db.from('SalaryPayout').select('id, user_id, net_paid, period_label, month, year, base_salary_snapshot, incentives, other_deductions, total_advances_deducted, status, created_at, user:User(full_name, role, employee_id)').eq('station_id', user.stationId).order('created_at', ascending: false).limit(20),
+        db.from('SalaryPayout').select('id, user_id, net_paid, period_label, month, year, base_salary_snapshot, incentives, other_deductions, total_advances_deducted, status, created_at, user:User!SalaryPayout_user_id_fkey(full_name, role, employee_id)').eq('station_id', user.stationId).order('created_at', ascending: false).limit(20),
         db.from('StaffAdvance').select('amount').eq('station_id', user.stationId),
       ]);
       final configMap = {for (final c in results[1] as List) (c as Map)['user_id'] as String: c};
@@ -136,7 +136,14 @@ class _PayrollDashboardScreenState extends ConsumerState<PayrollDashboardScreen>
         const SizedBox(height: 20),
         const SectionHeader(title: 'Staff — Pay Now'),
         const SizedBox(height: 12),
-        ..._staff.map((s) {
+        if (_staff.isEmpty)
+          const EmptyView(
+            title: 'No staff with salary config',
+            subtitle: 'Add staff and configure salary to use payroll',
+            icon: Icons.people_outline,
+          )
+        else
+          ..._staff.map((s) {
           final config = (_summary!['config_map'] as Map)[(s as Map)['id'] as String] as Map?;
           return Padding(padding: const EdgeInsets.only(bottom: 10), child: AppCard(child: Row(children: [
             Container(width: 40, height: 40, decoration: BoxDecoration(color: AppColors.blueBg, borderRadius: BorderRadius.circular(10)), alignment: Alignment.center, child: Text((s['full_name'] as String).substring(0, 1).toUpperCase(), style: const TextStyle(color: AppColors.blue, fontWeight: FontWeight.w700, fontSize: 16))),
@@ -151,7 +158,14 @@ class _PayrollDashboardScreenState extends ConsumerState<PayrollDashboardScreen>
         const SizedBox(height: 20),
         const SectionHeader(title: 'Recent Payouts'),
         const SizedBox(height: 12),
-        ..._payouts.take(10).map((p) => Padding(padding: const EdgeInsets.only(bottom: 8), child: AppCard(child: Row(children: [
+        if (_payouts.isEmpty)
+          const EmptyView(
+            title: 'No payouts recorded',
+            subtitle: 'Payouts will appear here after processing',
+            icon: Icons.payments_outlined,
+          )
+        else
+          ..._payouts.take(10).map((p) => Padding(padding: const EdgeInsets.only(bottom: 8), child: AppCard(child: Row(children: [
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text((p['user'] as Map?)?['full_name'] as String? ?? '', style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w500)),
             Text(p['period_label'] as String? ?? '', style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),

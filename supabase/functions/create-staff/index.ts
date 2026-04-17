@@ -7,12 +7,31 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import * as bcrypt from 'https://deno.land/x/bcrypt@v0.4.1/mod.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
     'authorization, x-client-info, apikey, content-type',
+}
+
+// Format: pbkdf2_sha256$iterations$saltHex$hashHex
+async function hashPassword(password: string): Promise<string> {
+  const salt = crypto.getRandomValues(new Uint8Array(16))
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits'],
+  )
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 100_000 },
+    keyMaterial,
+    256,
+  )
+  const toHex = (buf: Uint8Array) =>
+    Array.from(buf).map((b) => b.toString(16).padStart(2, '0')).join('')
+  return `pbkdf2_sha256$100000$${toHex(salt)}$${toHex(new Uint8Array(bits))}`
 }
 
 serve(async (req: Request) => {
@@ -44,10 +63,17 @@ serve(async (req: Request) => {
       return json({ error: 'role must be MANAGER or PUMP_PERSON' }, 400)
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    )
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
+    const FUELOS_SERVICE_ROLE_KEY = Deno.env.get('FUELOS_SERVICE_ROLE_KEY')
+    const missingEnv: string[] = []
+    if (!SUPABASE_URL) missingEnv.push('SUPABASE_URL')
+    if (!FUELOS_SERVICE_ROLE_KEY) missingEnv.push('FUELOS_SERVICE_ROLE_KEY')
+    if (missingEnv.length > 0) {
+      console.error('create-staff: missing env vars:', missingEnv.join(', '))
+      return json({ error: 'missing_env', missing: missingEnv }, 500)
+    }
+
+    const supabase = createClient(SUPABASE_URL!, FUELOS_SERVICE_ROLE_KEY!)
 
     // Check phone uniqueness within station
     // Prisma: @@unique([station_id, phone_number]) exists on User
@@ -83,7 +109,7 @@ serve(async (req: Request) => {
       }
     }
 
-    const passwordHash = await bcrypt.hash(String(password))
+    const passwordHash = await hashPassword(String(password))
     const now = new Date().toISOString()
     const userId = crypto.randomUUID()
 

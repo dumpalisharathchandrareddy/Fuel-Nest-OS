@@ -58,7 +58,6 @@
             android:value="2"/>
 
         <!-- Required for flutter_secure_storage -->
-        <uses-library android:name="android.security.keystore"/>
 
         <!-- For file sharing (share_plus) -->
         <provider

@@ -1,0 +1,828 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model FuelStation {
+  id                String              @id @default(uuid())
+  station_code      String              @unique
+  station_name      String
+  owner_user_id     String?             @unique
+  address_line_1    String?
+  address_line_2    String?
+  city              String?
+  state             String?
+  postal_code       String?
+  country           String              @default("India")
+  phone_number      String?
+  email             String?
+  active            Boolean             @default(true)
+  created_at        DateTime            @default(now())
+  updated_at        DateTime            @updatedAt
+  audit_logs        AuditLog[]
+  customers         CreditCustomer[]
+  credit_payments   CreditPayment[]
+  credits           CreditTransaction[]
+  dip_readings      DipReading[]
+  fuel_orders       FuelOrder[]
+  fuel_rates        FuelRate[]
+  owner             User?               @relation("StationOwner", fields: [owner_user_id], references: [id])
+  inventory_cheques InventoryCheque[]
+  notifications     Notification[]
+  nozzles           Nozzle[]
+  nozzle_entries    NozzleEntry[]
+  payment_records   PaymentRecord[]
+  pumps             Pump[]
+  receipts          Receipt[]
+  salary_configs    SalaryConfig[]
+  payouts           SalaryPayout[]
+  shifts            Shift[]
+  advances          StaffAdvance[]
+  stock_ledger      StockTransaction[]
+  tanks             Tank[]
+  users             User[]              @relation("StationMembership")
+  push_devices      UserPushDevice[]
+  webhook_config    WebhookConfig?
+  settings          StationSettings?
+  daily_expenses    DailyExpense[]
+  report_settings   ReportSettings?
+  message_queue_items MessageQueue[]
+  generated_reports         GeneratedReport[]
+  archive_requests           StaffArchiveRequest[] @relation("StationArchives")
+  period_start_day           Int                   @default(1)
+  pending_period_start_day   Int?
+  period_change_effective_at DateTime?
+  payroll_permissions        PayrollPermission[]
+  report_artifacts           GeneratedReportArtifact[]
+  timezone                   String                @default("Asia/Kolkata")
+  initial_stocks             TankInitialStock[]
+  whatsapp_config       WhatsAppConfig?
+}
+
+model User {
+  id                     String              @id @default(uuid())
+  station_id             String
+  role                   String
+  full_name              String
+  username               String
+  employee_id            String?
+  phone_number           String
+  email                  String?
+  password_hash          String
+  active                 Boolean             @default(true)
+  created_by_id          String?
+  last_login_at          DateTime?
+  created_at             DateTime            @default(now())
+  updated_at             DateTime            @updatedAt
+  audit_actions          AuditLog[]
+  created_customers      CreditCustomer[]    @relation("CustomerCreator")
+  credit_repayments      CreditPayment[]
+  credit_sales           CreditTransaction[]
+  dip_readings           DipReading[]
+  fuel_orders            FuelOrder[]         @relation("OrderCreator")
+  rates_set              FuelRate[]
+  owned_station          FuelStation?        @relation("StationOwner")
+  inventory_cheques      InventoryCheque[]   @relation("InventoryChequeCreator")
+  notifications          Notification[]      @relation("UserNotification")
+  resolved_mismatches    PaymentRecord[]     @relation("MismatchResolver")
+  uploaded_receipts      Receipt[]           @relation("ReceiptUploader")
+  created_salary_configs SalaryConfig[]      @relation("ConfigCreator")
+  salary_config          SalaryConfig?       @relation("StaffConfig")
+  generated_payouts      SalaryPayout[]      @relation("PayoutGenerator")
+  paid_payouts           SalaryPayout[]      @relation("PayoutPayer")
+  payouts                SalaryPayout[]      @relation("PayoutSubject")
+  assigned_shifts        Shift[]             @relation("ShiftAssignee")
+  recorded_advances      StaffAdvance[]      @relation("AdvanceRecorder")
+  advances               StaffAdvance[]      @relation("AdvanceSubject")
+  created_stock_txs      StockTransaction[]  @relation("StockTxCreator")
+  created_by             User?               @relation("UserCreatedBy", fields: [created_by_id], references: [id])
+  created_users          User[]              @relation("UserCreatedBy")
+  station                FuelStation         @relation("StationMembership", fields: [station_id], references: [id])
+  push_devices           UserPushDevice[]
+  archive_targets        StaffArchiveRequest[] @relation("TargetUser")
+  archive_requests       StaffArchiveRequest[] @relation("Requester")
+  resolved_archives      StaffArchiveRequest[] @relation("Resolver")
+  issued_advances        StaffAdvance[]        @relation("AdvanceIssuer")
+  voided_advances        StaffAdvance[]        @relation("AdvanceVoider")
+  payroll_under_dealer   PayrollPermission[]   @relation("DealerPermissions")
+  payroll_permissions    PayrollPermission[]   @relation("ManagerPermissions")
+  recorded_daily_expenses DailyExpense[]       @relation("ExpenseRecorder")
+  created_initial_stocks  TankInitialStock[]    @relation("InitialStockCreator")
+
+  @@unique([station_id, username])
+  @@unique([station_id, employee_id])
+  @@index([station_id])
+  @@index([phone_number])
+}
+
+model Pump {
+  id              String              @id @default(uuid())
+  station_id      String
+  name            String
+  provider_type   String              @default("NONE")
+  active          Boolean             @default(true)
+  created_at      DateTime            @default(now())
+  updated_at      DateTime            @updatedAt
+  credits         CreditTransaction[]
+  nozzles         Nozzle[]
+  payment_records PaymentRecord[]
+  station         FuelStation         @relation(fields: [station_id], references: [id])
+  shifts          Shift[]
+
+  @@unique([station_id, name])
+  @@index([station_id])
+}
+
+model Tank {
+  id                  String             @id @default(uuid())
+  station_id          String
+  name                String
+  fuel_type           String
+  capacity_liters     Decimal            @db.Decimal(12, 3)
+  active              Boolean            @default(true)
+  created_at          DateTime           @default(now())
+  updated_at          DateTime           @updatedAt
+  low_stock_threshold Decimal            @default(500) @db.Decimal(12, 3)
+  dip_readings        DipReading[]
+  nozzles             Nozzle[]
+  stock_transactions  StockTransaction[]
+  initial_stocks      TankInitialStock[]
+  station             FuelStation        @relation(fields: [station_id], references: [id])
+
+  @@unique([station_id, name])
+  @@index([station_id])
+}
+
+model Nozzle {
+  id              String        @id @default(uuid())
+  station_id      String
+  pump_id         String
+  tank_id         String
+  label           String
+  fuel_type       String
+  default_testing Decimal       @default(0) @db.Decimal(12, 3)
+  active          Boolean       @default(true)
+  created_at      DateTime      @default(now())
+  updated_at      DateTime      @updatedAt
+  pump            Pump          @relation(fields: [pump_id], references: [id])
+  station         FuelStation   @relation(fields: [station_id], references: [id])
+  tank            Tank          @relation(fields: [tank_id], references: [id])
+  nozzle_entries  NozzleEntry[]
+
+  @@unique([station_id, pump_id, label])
+  @@index([station_id])
+}
+
+model FuelRate {
+  id             String      @id @default(uuid())
+  station_id     String
+  fuel_type      String
+  rate           Decimal     @db.Decimal(12, 2)
+  set_by_id      String
+  effective_from DateTime    @default(now())
+  created_at     DateTime    @default(now())
+  set_by         User        @relation(fields: [set_by_id], references: [id])
+  station        FuelStation @relation(fields: [station_id], references: [id])
+  shifts         Shift[]
+
+  @@index([station_id, fuel_type])
+  @@index([station_id])
+}
+
+model Shift {
+  id                  String              @id @default(uuid())
+  station_id          String
+  pump_id             String
+  assigned_user_id    String
+  shift_label         String?
+  status              String              @default("OPEN")
+  rate_confirmed      Boolean             @default(false)
+  confirmed_rate_id   String?
+  handover_note       String?
+  start_time          DateTime            @default(now())
+  submitted_at        DateTime?
+  closed_at           DateTime?
+  created_at          DateTime            @default(now())
+  updated_at          DateTime            @updatedAt
+  credit_transactions CreditTransaction[]
+  nozzle_entries      NozzleEntry[]
+  payment_record      PaymentRecord?
+  assigned_worker     User                @relation("ShiftAssignee", fields: [assigned_user_id], references: [id])
+  confirmed_rate      FuelRate?           @relation(fields: [confirmed_rate_id], references: [id])
+  pump                Pump                @relation(fields: [pump_id], references: [id])
+  station             FuelStation         @relation(fields: [station_id], references: [id])
+  business_date       String?
+
+  @@index([station_id])
+  @@index([station_id, status, closed_at])
+  @@index([station_id, pump_id, closed_at])
+  @@index([station_id, business_date])
+}
+
+model NozzleEntry {
+  id                      String      @id @default(uuid())
+  station_id              String
+  shift_id                String
+  nozzle_id               String
+  opening_reading         Decimal     @db.Decimal(12, 3)
+  closing_reading         Decimal?    @db.Decimal(12, 3)
+  testing_quantity        Decimal     @default(0) @db.Decimal(12, 3)
+  testing_override_reason String?
+  opening_override_reason String?
+  sale_litres             Decimal?    @db.Decimal(12, 3)
+  rate                    Decimal     @db.Decimal(12, 2)
+  sale_amount             Decimal?    @db.Decimal(12, 2)
+  created_at              DateTime    @default(now())
+  updated_at              DateTime    @updatedAt
+  nozzle                  Nozzle      @relation(fields: [nozzle_id], references: [id])
+  shift                   Shift       @relation(fields: [shift_id], references: [id])
+  station                 FuelStation @relation(fields: [station_id], references: [id])
+
+  @@index([station_id])
+  @@index([station_id, shift_id, nozzle_id])
+}
+
+model PaymentRecord {
+  id                           String      @id @default(uuid())
+  station_id                   String
+  shift_id                     String      @unique
+  pump_id                      String
+  upi_amount                   Decimal     @default(0) @db.Decimal(12, 2)
+  upi_source                   String?
+  upi_fetched_at               DateTime?
+  card_amount                  Decimal     @default(0) @db.Decimal(12, 2)
+  credit_amount                Decimal     @default(0) @db.Decimal(12, 2)
+  cash_to_collect              Decimal     @default(0) @db.Decimal(12, 2)
+  actual_cash_collected_amount Decimal?    @db.Decimal(12, 2)
+  cash_collected               Boolean     @default(false)
+  cash_collected_at            DateTime?
+  total_sale_amount            Decimal     @default(0) @db.Decimal(12, 2)
+  is_balanced                  Boolean     @default(false)
+  mismatch_amount              Decimal     @default(0) @db.Decimal(12, 2)
+  mismatch_resolution_note     String?
+  mismatch_resolved_by_id      String?
+  created_at                   DateTime    @default(now())
+  updated_at                   DateTime    @updatedAt
+  mismatch_resolved_by         User?       @relation("MismatchResolver", fields: [mismatch_resolved_by_id], references: [id])
+  pump                         Pump        @relation(fields: [pump_id], references: [id])
+  shift                        Shift       @relation(fields: [shift_id], references: [id])
+  station                      FuelStation @relation(fields: [station_id], references: [id])
+
+  @@index([station_id])
+  @@index([station_id, pump_id, created_at])
+  @@index([station_id, shift_id])
+}
+
+model CreditCustomer {
+  id              String              @id @default(uuid())
+  station_id      String
+  full_name       String
+  phone_number    String
+  email           String?
+  customer_code   String
+  active          Boolean             @default(true)
+  created_by_id   String?
+  created_at      DateTime            @default(now())
+  updated_at      DateTime            @updatedAt
+  deleted_at      DateTime?
+  advance_balance Decimal             @default(0) @db.Decimal(12, 2)
+  is_walk_in      Boolean             @default(false)
+  created_by      User?               @relation("CustomerCreator", fields: [created_by_id], references: [id])
+  station         FuelStation         @relation(fields: [station_id], references: [id])
+  transactions    CreditTransaction[]
+
+  @@unique([station_id, phone_number])
+  @@unique([station_id, customer_code])
+  @@index([station_id])
+  @@index([station_id, deleted_at])
+  @@index([station_id, is_walk_in])
+}
+
+model CreditTransaction {
+  id                String          @id @default(uuid())
+  station_id        String
+  customer_id       String
+  pump_id           String?
+  shift_id          String?
+  date              DateTime
+  amount            Decimal         @db.Decimal(12, 2)
+  liters            Decimal?        @db.Decimal(12, 3)
+  fuel_type         String?
+  remaining_balance Decimal         @db.Decimal(12, 2)
+  status            String          @default("PENDING")
+  created_by_id     String
+  created_at        DateTime        @default(now())
+  updated_at        DateTime        @updatedAt
+  payments          CreditPayment[]
+  created_by        User            @relation(fields: [created_by_id], references: [id])
+  customer          CreditCustomer  @relation(fields: [customer_id], references: [id])
+  pump              Pump?           @relation(fields: [pump_id], references: [id])
+  shift             Shift?          @relation(fields: [shift_id], references: [id])
+  station           FuelStation     @relation(fields: [station_id], references: [id])
+  business_date     String?
+
+  @@index([station_id])
+  @@index([station_id, shift_id, created_at])
+  @@index([station_id, date])
+  @@index([station_id, business_date])
+}
+
+model CreditPayment {
+  id              String            @id @default(uuid())
+  station_id      String
+  credit_id       String
+  paid_amount     Decimal           @db.Decimal(12, 2)
+  payment_mode    String
+  date            DateTime
+  note            String?
+  recorded_by_id  String
+  idempotency_key String?           @unique
+  created_at      DateTime          @default(now())
+  credit          CreditTransaction @relation(fields: [credit_id], references: [id])
+  recorded_by     User              @relation(fields: [recorded_by_id], references: [id])
+  station         FuelStation       @relation(fields: [station_id], references: [id])
+  business_date   String?
+
+  @@index([station_id])
+  @@index([station_id, date])
+  @@index([station_id, business_date])
+}
+
+model FuelOrder {
+  id               String           @id @default(uuid())
+  station_id       String
+  invoice_no       String
+  vendor           String
+  date             DateTime
+  total_amount     Decimal          @db.Decimal(12, 2)
+  status           String           @default("DRAFT")
+  created_by_id    String
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @updatedAt
+  total_liters     Decimal          @default(0) @db.Decimal(12, 3)
+  payment_mode     String           @default("CASH")
+  cheque_reference String?
+  notes            String?
+  linked_cheque_id String?
+  created_by       User             @relation("OrderCreator", fields: [created_by_id], references: [id])
+  linked_cheque    InventoryCheque? @relation(fields: [linked_cheque_id], references: [id])
+  station          FuelStation      @relation(fields: [station_id], references: [id])
+
+  @@unique([station_id, invoice_no])
+  @@index([station_id])
+  @@index([station_id, linked_cheque_id])
+}
+
+model InventoryCheque {
+  id               String      @id @default(uuid())
+  station_id       String
+  vendor           String
+  amount           Decimal     @db.Decimal(12, 2)
+  cheque_reference String
+  payment_date     DateTime
+  status           String      @default("ISSUED")
+  notes            String?
+  created_by_id    String
+  created_at       DateTime    @default(now())
+  updated_at       DateTime    @updatedAt
+  fuel_orders      FuelOrder[]
+  created_by       User        @relation("InventoryChequeCreator", fields: [created_by_id], references: [id])
+  station          FuelStation @relation(fields: [station_id], references: [id])
+
+  @@index([station_id])
+}
+
+model StockTransaction {
+  id            String      @id @default(uuid())
+  station_id    String
+  tank_id       String
+  type          String
+  quantity      Decimal     @db.Decimal(12, 3)
+  reference_id  String
+  created_by_id String?
+  created_at    DateTime    @default(now())
+  created_by    User?       @relation("StockTxCreator", fields: [created_by_id], references: [id])
+  station       FuelStation @relation(fields: [station_id], references: [id])
+  tank          Tank        @relation(fields: [tank_id], references: [id])
+
+  @@unique([station_id, reference_id, type, tank_id])
+  @@index([station_id])
+}
+
+model DipReading {
+  id                String      @id @default(uuid())
+  station_id        String
+  tank_id           String
+  reading_mm        Decimal?    @db.Decimal(12, 3)
+  calculated_volume Decimal     @db.Decimal(12, 3)
+  variation_liters  Decimal?    @db.Decimal(12, 3)
+  captured_at       DateTime    @default(now())
+  captured_by_id    String
+  created_at        DateTime    @default(now())
+  captured_by       User        @relation(fields: [captured_by_id], references: [id])
+  station           FuelStation @relation(fields: [station_id], references: [id])
+  tank              Tank        @relation(fields: [tank_id], references: [id])
+
+  @@index([station_id])
+}
+
+model SalaryConfig {
+  id                  String      @id @default(uuid())
+  station_id          String
+  user_id             String      @unique
+  base_monthly_salary Decimal     @db.Decimal(12, 2)
+  hourly_rate         Decimal?    @db.Decimal(12, 2)
+  effective_from      DateTime    @default(now())
+  created_by_id       String
+  created_at          DateTime    @default(now())
+  updated_at          DateTime    @updatedAt
+  created_by          User        @relation("ConfigCreator", fields: [created_by_id], references: [id])
+  station             FuelStation @relation(fields: [station_id], references: [id])
+  user                User        @relation("StaffConfig", fields: [user_id], references: [id])
+
+  @@index([station_id])
+}
+
+model StaffAdvance {
+  id                 String        @id @default(uuid())
+  station_id         String
+  user_id            String
+  amount             Decimal       @db.Decimal(12, 2)
+  date               DateTime      @default(now())
+  status             String        @default("PENDING")
+  reference_shift_id String?
+  note               String?
+  recorded_by_id     String
+  created_at         DateTime      @default(now())
+  updated_at         DateTime      @updatedAt
+  payout_id          String?
+  payout             SalaryPayout? @relation(fields: [payout_id], references: [id])
+  recorded_by        User          @relation("AdvanceRecorder", fields: [recorded_by_id], references: [id])
+  station            FuelStation   @relation(fields: [station_id], references: [id])
+  user               User          @relation("AdvanceSubject", fields: [user_id], references: [id])
+  reason             String?
+  issued_by_id       String?
+  issued_by          User?         @relation("AdvanceIssuer", fields: [issued_by_id], references: [id])
+  pay_period_label   String?
+  is_voided          Boolean       @default(false)
+  voided_by_id       String?
+  voided_by          User?         @relation("AdvanceVoider", fields: [voided_by_id], references: [id])
+  voided_at          DateTime?
+  void_reason        String?
+
+  @@index([station_id])
+}
+
+model SalaryPayout {
+  id                      String         @id @default(uuid())
+  station_id              String
+  user_id                 String
+  month                   Int
+  year                    Int
+  period_label            String?
+  base_salary_snapshot    Decimal        @db.Decimal(12, 2)
+  total_advances_deducted Decimal        @default(0) @db.Decimal(12, 2)
+  other_deductions        Decimal        @default(0) @db.Decimal(12, 2)
+  incentives              Decimal        @default(0) @db.Decimal(12, 2)
+  net_paid                Decimal        @db.Decimal(12, 2)
+  status                  String         @default("PROCESSED")
+  generated_by_id         String
+  paid_by_id              String?
+  created_at              DateTime       @default(now())
+  updated_at              DateTime       @updatedAt
+  generated_by            User           @relation("PayoutGenerator", fields: [generated_by_id], references: [id])
+  paid_by                 User?          @relation("PayoutPayer", fields: [paid_by_id], references: [id])
+  station                 FuelStation    @relation(fields: [station_id], references: [id])
+  user                    User           @relation("PayoutSubject", fields: [user_id], references: [id])
+  advances                StaffAdvance[]
+
+  @@unique([station_id, user_id, month, year])
+  @@index([station_id])
+}
+
+model Receipt {
+  id             String      @id @default(uuid())
+  station_id     String
+  module         String
+  reference_id   String
+  image_url      String
+  captured_via   String?
+  bypass_reason  String?
+  uploaded_by_id String
+  created_at     DateTime    @default(now())
+  station        FuelStation @relation(fields: [station_id], references: [id])
+  uploaded_by    User        @relation("ReceiptUploader", fields: [uploaded_by_id], references: [id])
+
+  @@index([station_id])
+}
+
+model AuditLog {
+  id           String      @id @default(uuid())
+  station_id   String
+  user_id      String
+  user_role    String
+  action_type  String
+  module       String
+  reference_id String
+  old_value    Json?
+  new_value    Json?
+  reason       String?
+  timestamp    DateTime    @default(now())
+  station      FuelStation @relation(fields: [station_id], references: [id])
+  user         User        @relation(fields: [user_id], references: [id])
+
+  @@index([station_id])
+}
+
+model Notification {
+  id         String      @id @default(uuid())
+  station_id String
+  user_id    String
+  type       String
+  title      String
+  message    String
+  read       Boolean     @default(false)
+  created_at DateTime    @default(now())
+  station    FuelStation @relation(fields: [station_id], references: [id])
+  user       User        @relation("UserNotification", fields: [user_id], references: [id])
+
+  @@index([station_id])
+}
+
+model UserPushDevice {
+  id           String      @id @default(uuid())
+  station_id   String
+  user_id      String
+  token        String      @unique
+  platform     String      @default("web")
+  device_label String?
+  active       Boolean     @default(true)
+  last_seen_at DateTime    @default(now())
+  created_at   DateTime    @default(now())
+  updated_at   DateTime    @updatedAt
+  station      FuelStation @relation(fields: [station_id], references: [id])
+  user         User        @relation(fields: [user_id], references: [id])
+
+  @@index([station_id])
+  @@index([user_id, active])
+}
+
+model StationSettings {
+  id                          String   @id @default(uuid())
+  station_id                  String   @unique
+  manager_can_edit_fuel_rates Boolean  @default(false)
+  created_at                  DateTime @default(now())
+  updated_at                  DateTime @updatedAt
+  shift_whatsapp_share_policy String   @default("OPTIONAL")
+  inventory_dip_check_enabled Boolean  @default(true)
+  testing_fuel_default        Decimal  @default(5) @db.Decimal(12, 3)
+  google_drive_auth_type String?
+  google_drive_refresh_token String?
+  google_drive_connected_email String?
+  google_drive_connected_name String?
+  google_drive_connected_at DateTime?
+  google_drive_folder_ready Boolean @default(false)
+  google_drive_last_error String?
+  google_drive_oauth_state String?
+  google_drive_oauth_state_expires_at DateTime?
+  google_service_account_email String?
+  google_service_account_private_key String?
+  google_reports_root_folder_id String?
+  google_reports_folder_id      String?
+  station                    FuelStation @relation(fields: [station_id], references: [id])
+
+  @@index([station_id])
+}
+
+model DailyExpense {
+  id                  String      @id @default(uuid())
+  station_id          String
+  expense_date        DateTime
+  recorded_at         DateTime    @default(now())
+  name                String
+  category            String
+  custom_category     String?
+  amount              Decimal     @db.Decimal(12, 2)
+  description         String?
+  vendor_name         String?
+  receipt_url         String?
+  recorded_by         String
+  is_system_generated Boolean     @default(false)
+  deleted_at          DateTime?
+  deleted_by_id       String?
+  created_at          DateTime    @default(now())
+  updated_at          DateTime    @updatedAt
+  station             FuelStation @relation(fields: [station_id], references: [id])
+  recorder            User        @relation("ExpenseRecorder", fields: [recorded_by], references: [id])
+  business_date       String?
+
+  @@index([station_id])
+  @@index([station_id, expense_date])
+  @@index([station_id, category])
+  @@index([station_id, deleted_at])
+  @@index([station_id, business_date])
+}
+
+model GeneratedReport {
+  id            String      @id @default(uuid())
+  station_id    String
+  type          String
+  period_label  String
+  period_start  DateTime
+  period_end    DateTime
+  status        String      @default("PENDING")
+  report_data   Json?
+  pdf_url       String?
+  excel_url     String?
+  drive_file_id String?
+  drive_url     String?
+  error_message String?
+  generated_at  DateTime?
+  created_at    DateTime    @default(now())
+  updated_at    DateTime    @updatedAt
+  station       FuelStation @relation(fields: [station_id], references: [id])
+
+  @@index([station_id])
+  @@index([station_id, type, period_start])
+  @@index([station_id, status, created_at])
+}
+
+model ReportSettings {
+  id                       String      @id @default(uuid())
+  station_id               String      @unique
+  show_weekly_comparison   Boolean     @default(true)
+  show_monthly_comparison  Boolean     @default(false)
+  comparison_type          String      @default("previous_period")
+  weekly_report_day        Int         @default(0)
+  daily_report_time        String      @default("auto")
+  whatsapp_enabled         Boolean     @default(true)
+  drive_enabled            Boolean     @default(true)
+  include_payroll          Boolean     @default(false)
+  include_expenses         Boolean     @default(false)
+  manager_view_daily       Boolean     @default(true)
+  manager_view_weekly      Boolean     @default(false)
+  manager_view_monthly     Boolean     @default(false)
+  manager_generate_custom  Boolean     @default(false)
+  manager_download_xlsx    Boolean     @default(false)
+  manager_view_payroll     Boolean     @default(false)
+  manager_view_expenses    Boolean     @default(false)
+  last_cron_fired_at       DateTime?
+  created_at               DateTime    @default(now())
+  updated_at               DateTime    @updatedAt
+  station                  FuelStation @relation(fields: [station_id], references: [id])
+
+  @@index([station_id])
+}
+
+model MessageQueue {
+  id            String      @id @default(uuid())
+  station_id    String
+  event_type    String
+  payload       Json
+  scheduled_at  DateTime    @default(now())
+  status        String      @default("PENDING")
+  attempts      Int         @default(0)
+  last_error    String?
+  sent_at       DateTime?
+  created_at    DateTime    @default(now())
+  updated_at    DateTime    @updatedAt
+  station       FuelStation @relation(fields: [station_id], references: [id])
+
+  @@index([station_id])
+  @@index([station_id, status, scheduled_at])
+}
+
+model StaffArchiveRequest {
+  id              String    @id @default(uuid())
+  station_id      String
+  target_user_id  String
+  requested_by_id String
+  resolved_by_id  String?
+  status          String    @default("PENDING")
+  reason          String?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  resolved_at     DateTime?
+  target_user     User        @relation("TargetUser", fields: [target_user_id], references: [id])
+  requested_by    User        @relation("Requester", fields: [requested_by_id], references: [id])
+  resolved_by     User?       @relation("Resolver", fields: [resolved_by_id], references: [id])
+  station         FuelStation @relation("StationArchives", fields: [station_id], references: [id])
+
+  @@index([station_id])
+  @@index([station_id, status])
+}
+
+model WebhookConfig {
+  id               String      @id @default(uuid())
+  station_id       String      @unique
+  url              String
+  secret           String?
+  enabled          Boolean     @default(true)
+  last_delivery_at DateTime?
+  last_status      String?
+  created_at       DateTime    @default(now())
+  updated_at       DateTime    @updatedAt
+  routes           Json?
+  station          FuelStation @relation(fields: [station_id], references: [id])
+
+  @@index([station_id])
+}
+
+model WhatsAppConfig {
+  id                    String      @id @default(uuid())
+  station_id            String      @unique
+  waha_url              String      @default("http://localhost:5656")
+  session_name          String
+  is_connected          Boolean     @default(false)
+  connected_phone       String?
+  group_id              String?
+  group_name            String?
+  dealer_phone          String?
+
+  // Notification toggles
+  notify_shift_close    Boolean     @default(true)
+  notify_fuel_delivery  Boolean     @default(true)
+  notify_credit_entry   Boolean     @default(false)
+  notify_payroll        Boolean     @default(false)
+  notify_low_tank       Boolean     @default(true)
+  notify_cheque         Boolean     @default(true)
+
+  // Credit reminders
+  reminder_enabled      Boolean     @default(false)
+  reminder_days         String      @default("MON,THU")
+  reminder_time         String      @default("10:00")
+  reminder_threshold    Decimal     @default(500) @db.Decimal(12, 2)
+
+  created_at            DateTime    @default(now())
+  updated_at            DateTime    @updatedAt
+  station               FuelStation @relation(fields: [station_id], references: [id])
+
+  @@index([station_id])
+}
+
+model PayrollPermission {
+  id           String      @id @default(uuid())
+  station_id   String
+  manager_id   String
+  dealer_id    String
+  payroll_edit Boolean     @default(false)
+  created_at   DateTime    @default(now())
+  updated_at   DateTime    @updatedAt
+  station      FuelStation @relation(fields: [station_id], references: [id])
+  manager      User        @relation("ManagerPermissions", fields: [manager_id], references: [id])
+  dealer       User        @relation("DealerPermissions", fields: [dealer_id], references: [id])
+
+  @@unique([station_id, manager_id])
+  @@index([station_id])
+}
+
+model GeneratedReportArtifact {
+  id                         String      @id @default(uuid())
+  station_id                 String
+  report_type                String
+  report_period_key          String
+  period_label               String?
+  format                     String
+  file_name                  String?
+  drive_file_id              String?
+  drive_folder_id            String?
+  message_queue_id           String?
+  public_url                 String?
+  metadata                   Json?
+  generation_status          String      @default("PENDING")
+  last_generated_at          DateTime?
+  last_source_shift_closed_at DateTime?
+  last_error                 String?
+  created_at                 DateTime    @default(now())
+  updated_at                 DateTime    @updatedAt
+  station                    FuelStation @relation(fields: [station_id], references: [id])
+
+  @@unique([station_id, report_type, report_period_key, format])
+  @@index([station_id])
+  @@index([station_id, report_type, report_period_key])
+}
+
+model TankInitialStock {
+  id             String      @id @default(uuid())
+  station_id     String
+  tank_id        String
+  fuel_type      String
+  opening_litres Decimal     @db.Decimal(12, 3)
+  stock_date     DateTime
+  notes          String?
+  recorded_by_id String
+  created_at     DateTime    @default(now())
+  updated_at     DateTime    @updatedAt
+  
+  station        FuelStation @relation(fields: [station_id], references: [id])
+  tank           Tank        @relation(fields: [tank_id], references: [id])
+  recorded_by    User        @relation("InitialStockCreator", fields: [recorded_by_id], references: [id])
+
+  @@unique([station_id, tank_id, stock_date])
+  @@index([station_id])
+}

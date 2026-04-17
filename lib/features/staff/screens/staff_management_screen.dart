@@ -11,6 +11,31 @@ import 'package:uuid/uuid.dart';
 
 class StaffManagementScreen extends ConsumerStatefulWidget {
   const StaffManagementScreen({super.key});
+
+  static String suggestEmployeeId(List<dynamic> staff, String role) {
+    final prefix = role == 'MANAGER' ? 'MGR' : 'WKE';
+    final existing = staff
+        .map((s) => s['employee_id'] as String? ?? '')
+        .where((id) => id.startsWith('$prefix-'))
+        .map((id) => int.tryParse(id.substring(prefix.length + 1)) ?? 0)
+        .toList();
+    final next =
+        existing.isEmpty ? 1 : existing.reduce((a, b) => a > b ? a : b) + 1;
+    return '$prefix-${next.toString().padLeft(3, '0')}';
+  }
+
+  static String deriveUsername(String fullName, String employeeId) {
+    final letters = fullName.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
+    final first = letters.length >= 2
+        ? letters.substring(0, 2)
+        : letters.padRight(2, 'x');
+    final last = letters.length >= 2
+        ? letters.substring(letters.length - 2)
+        : letters.padLeft(2, 'x');
+    final nums = employeeId.replaceAll(RegExp(r'\D'), '').padLeft(3, '0');
+    return '$first$last@$nums';
+  }
+
   @override
   ConsumerState<StaffManagementScreen> createState() =>
       _StaffManagementScreenState();
@@ -31,9 +56,9 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
     _fetch();
   }
 
-  Future<void> _fetch() async {
+  Future<void> _fetch({bool silent = false}) async {
     setState(() {
-      _loading = true;
+      if (!silent) _loading = true;
       _error = null;
     });
     try {
@@ -47,14 +72,14 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
         db
             .from('User')
             .select(
-                'id, full_name, username, employee_id, phone_number, role, active, created_at, salary_config:SalaryConfig(base_monthly_salary, effective_from)')
+                'id, full_name, username, employee_id, phone_number, role, active, created_at, salary_config:SalaryConfig!SalaryConfig_user_id_fkey(base_monthly_salary, effective_from)')
             .eq('station_id', user.stationId)
             .neq('role', 'DEALER')
             .order('full_name'),
         db
             .from('StaffArchiveRequest')
             .select(
-                'id, status, reason, created_at, target_user_id, requested_by_id')
+                'id, status, reason, created_at, target_user_id, requested_by_id, target_user:User!StaffArchiveRequest_target_user_id_fkey(id, full_name), requested_by:User!StaffArchiveRequest_requested_by_id_fkey(id, full_name)')
             .eq('station_id', user.stationId)
             .eq('status', 'PENDING'),
       ]);
@@ -88,423 +113,40 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
         return matchSearch && matchRole && matchStatus;
       }).toList();
 
-  String _suggestEmployeeId(String role) {
-    final prefix = role == 'MANAGER' ? 'MGR' : 'WKE';
-    final existing = _staff
-        .map((s) => s['employee_id'] as String? ?? '')
-        .where((id) => id.startsWith('$prefix-'))
-        .map((id) => int.tryParse(id.substring(prefix.length + 1)) ?? 0)
-        .toList();
-    final next =
-        existing.isEmpty ? 1 : existing.reduce((a, b) => a > b ? a : b) + 1;
-    return '$prefix-${next.toString().padLeft(3, '0')}';
-  }
-
-  String _deriveUsername(String fullName, String employeeId) {
-    final letters = fullName.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
-    final first = letters.length >= 2
-        ? letters.substring(0, 2)
-        : letters.padRight(2, 'x');
-    final last = letters.length >= 2
-        ? letters.substring(letters.length - 2)
-        : letters.padLeft(2, 'x');
-    final nums = employeeId.replaceAll(RegExp(r'\D'), '').padLeft(3, '0');
-    return '$first$last@$nums';
-  }
 
   // ── Add / Edit Staff ────────────────────────────────────────────────────────
   Future<void> _showStaffForm({Map<String, dynamic>? existing}) async {
-    final isEdit = existing != null;
-    final nameCtrl =
-        TextEditingController(text: existing?['full_name'] as String? ?? '');
-    final phoneCtrl =
-        TextEditingController(text: existing?['phone_number'] as String? ?? '');
-    final passCtrl = TextEditingController();
-    final empIdCtrl =
-        TextEditingController(text: existing?['employee_id'] as String? ?? '');
-    final usernameCtrl =
-        TextEditingController(text: existing?['username'] as String? ?? '');
-    final salaryCtrl = TextEditingController(
-        text: (existing?['salary_config'] as Map?)?['base_monthly_salary']
-                ?.toString() ??
-            '');
-    String role = existing?['role'] as String? ?? 'PUMP_PERSON';
-    bool submitting = false;
-    String? err;
-
-    if (!isEdit) {
-      empIdCtrl.text = _suggestEmployeeId(role);
-    }
-
-    await showModalBottomSheet(
+    final success = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.bgSurface,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) => StatefulBuilder(builder: (ctx, ss) {
-        void onNameOrIdChanged() {
-          if (!isEdit) {
-            usernameCtrl.text = _deriveUsername(nameCtrl.text, empIdCtrl.text);
-          }
-        }
-
-        return SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-              20, 20, 20, MediaQuery.viewInsetsOf(ctx).bottom + 24),
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Icon(isEdit ? Icons.edit_outlined : Icons.person_add_alt,
-                  color: AppColors.blue, size: 22),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: Text(isEdit ? 'Edit Staff Member' : 'Add Staff Member',
-                      style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700))),
-              IconButton(
-                  icon: const Icon(Icons.close,
-                      size: 20, color: AppColors.textMuted),
-                  onPressed: () => Navigator.pop(ctx)),
-            ]),
-            const SizedBox(height: 20),
-
-            // Role selector
-            const Text('ROLE',
-                style: TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1)),
-            const SizedBox(height: 8),
-            Row(
-                children: ['MANAGER', 'PUMP_PERSON'].map((r) {
-              final sel = role == r;
-              final label = r == 'MANAGER' ? 'Manager' : 'Staff / Pump Person';
-              final color = r == 'MANAGER' ? AppColors.blue : AppColors.green;
-              return Expanded(
-                  child: GestureDetector(
-                onTap: () {
-                  ss(() {
-                    role = r;
-                    if (!isEdit) empIdCtrl.text = _suggestEmployeeId(r);
-                    onNameOrIdChanged();
-                  });
-                },
-                child: Container(
-                  margin: EdgeInsets.only(right: r == 'MANAGER' ? 8 : 0),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                      color: sel
-                          ? color.withValues(alpha: 0.15)
-                          : AppColors.bgCard,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                          color: sel ? color : AppColors.border,
-                          width: sel ? 1.5 : 1)),
-                  alignment: Alignment.center,
-                  child: Text(label,
-                      style: TextStyle(
-                          color: sel ? color : AppColors.textSecondary,
-                          fontWeight: sel ? FontWeight.w700 : FontWeight.w400,
-                          fontSize: 13)),
-                ),
-              ));
-            }).toList()),
-            const SizedBox(height: 16),
-
-            _Field(
-                label: 'Full Name *',
-                ctrl: nameCtrl,
-                capitalize: TextCapitalization.words,
-                onChanged: (_) => ss(onNameOrIdChanged)),
-            const SizedBox(height: 12),
-            _Field(
-                label: 'Mobile Number *',
-                ctrl: phoneCtrl,
-                keyboard: TextInputType.phone),
-            const SizedBox(height: 12),
-            Row(children: [
-              Expanded(
-                  child: _Field(
-                      label: 'Employee ID',
-                      ctrl: empIdCtrl,
-                      capitalize: TextCapitalization.characters,
-                      onChanged: (_) => ss(onNameOrIdChanged))),
-              const SizedBox(width: 8),
-              Expanded(child: _Field(label: 'Username', ctrl: usernameCtrl)),
-            ]),
-            const SizedBox(height: 12),
-            _Field(
-                label: 'Base Salary (₹/month)',
-                ctrl: salaryCtrl,
-                keyboard: const TextInputType.numberWithOptions(decimal: true)),
-            const SizedBox(height: 12),
-            _Field(
-                label: isEdit
-                    ? 'New Password (leave blank to keep)'
-                    : 'Password *',
-                ctrl: passCtrl,
-                obscure: true),
-            const SizedBox(height: 4),
-            const Text(
-                'Staff can also login with PIN — set it separately after creation',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
-
-            if (err != null) ...[
-              const SizedBox(height: 12),
-              Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                      color: AppColors.redBg,
-                      borderRadius: BorderRadius.circular(8)),
-                  child: Text(err!,
-                      style:
-                          const TextStyle(color: AppColors.red, fontSize: 12))),
-            ],
-            const SizedBox(height: 20),
-            AppButton(
-              label: isEdit ? 'Save Changes' : 'Create Staff Member',
-              loading: submitting,
-              width: double.infinity,
-              onTap: () async {
-                if (nameCtrl.text.trim().isEmpty ||
-                    phoneCtrl.text.trim().isEmpty) {
-                  ss(() => err = 'Name and phone number are required');
-                  return;
-                }
-                if (!isEdit && passCtrl.text.isEmpty) {
-                  ss(() => err = 'Password is required for new staff');
-                  return;
-                }
-                ss(() {
-                  submitting = true;
-                  err = null;
-                });
-                try {
-                  final db = TenantService.instance.client;
-                  final user = ref.read(currentUserProvider)!;
-                  final now = DateTime.now().toUtc().toIso8601String();
-                  final salary = double.tryParse(salaryCtrl.text) ?? 0;
-
-                  if (isEdit) {
-                    await db.from('User').update({
-                      'full_name': nameCtrl.text.trim(),
-                      'phone_number': phoneCtrl.text.trim(),
-                      'employee_id': empIdCtrl.text.trim().isEmpty
-                          ? null
-                          : empIdCtrl.text.trim(),
-                      'username': usernameCtrl.text.trim().isEmpty
-                          ? null
-                          : usernameCtrl.text.trim(),
-                      'role': role,
-                      'updated_at': now,
-                      if (passCtrl.text.isNotEmpty)
-                        'password_hash': passCtrl.text, // Edge fn hashes it
-                    }).eq('id', existing['id']);
-
-                    // Update salary config
-                    if (salary > 0) {
-                      await db.from('SalaryConfig').upsert({
-                        'station_id': user.stationId,
-                        'user_id': existing['id'],
-                        'base_monthly_salary': salary,
-// // SalaryConfig has no /* SalaryConfig has no /* no salary_type */ */ column // SalaryConfig has no salary_type column
-                        'updated_at': now,
-                      }, onConflict: 'user_id');
-                    }
-                  } else {
-                    // Create via edge function (handles password hashing)
-                    final resp =
-                        await db.functions.invoke('create-staff', body: {
-                      'full_name': nameCtrl.text.trim(),
-                      'phone_number': phoneCtrl.text.trim(),
-                      'employee_id': empIdCtrl.text.trim().isEmpty
-                          ? null
-                          : empIdCtrl.text.trim(),
-                      'username': usernameCtrl.text.trim().isEmpty
-                          ? null
-                          : usernameCtrl.text.trim(),
-                      'role': role,
-                      'password': passCtrl.text,
-                      'station_id': user.stationId,
-                      'base_salary_snapshot': salary,
-                      'created_by': user.id,
-                    });
-
-                    // Fallback if edge function not deployed: direct insert with plain password
-                    // (Edge function should hash it; this is a dev fallback)
-                    if (resp.status != 200) {
-                      final newUserId = _uuid();
-                      await db.from('User').insert({
-                        'id': newUserId,
-                        'station_id': user.stationId,
-                        'full_name': nameCtrl.text.trim(),
-                        'phone_number': phoneCtrl.text.trim(),
-                        'employee_id': empIdCtrl.text.trim().isEmpty
-                            ? null
-                            : empIdCtrl.text.trim(),
-                        'username': usernameCtrl.text.trim().isEmpty
-                            ? null
-                            : usernameCtrl.text.trim(),
-                        'role': role,
-                        'password_hash': passCtrl.text,
-                        'active': true,
-                        'created_by_id': user.id,
-                        'created_at': now,
-                        'updated_at': now,
-                      });
-                      if (salary > 0) {
-                        await db.from('SalaryConfig').insert({
-                          'station_id': user.stationId,
-                          'user_id': newUserId,
-                          'base_monthly_salary': salary,
-// // SalaryConfig has no /* SalaryConfig has no /* no salary_type */ */ column // SalaryConfig has no salary_type column
-                          'created_by': user.id,
-                          'created_at': now,
-                          'updated_at': now,
-                        });
-                      }
-                    }
-                  }
-
-                  await DiscordService.instance.sendStaffChange(
-                    action: isEdit ? 'Updated' : 'Created',
-                    staffName: nameCtrl.text.trim(),
-                    role: role,
-                    stationName: ref.read(stationNameProvider),
-                  );
-
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text(isEdit
-                            ? '✅ Staff updated'
-                            : '✅ ${nameCtrl.text.trim()} added'),
-                        backgroundColor: AppColors.green));
-                    _fetch();
-                  }
-                } catch (e) {
-                  ss(() {
-                    submitting = false;
-                    err = e.toString().replaceAll('Exception: ', '');
-                  });
-                }
-              },
-            ),
-          ]),
-        );
-      }),
+      builder: (ctx) => StaffFormSheet(
+        existing: existing,
+        existingStaff: _staff,
+      ),
     );
-    for (final c in [
-      nameCtrl,
-      phoneCtrl,
-      passCtrl,
-      empIdCtrl,
-      usernameCtrl,
-      salaryCtrl
-    ]) {
-      c.dispose();
+
+    if (success == true) {
+      _fetch(silent: true);
     }
   }
 
   // ── Set PIN ──────────────────────────────────────────────────────────────────
   Future<void> _showSetPin(Map<String, dynamic> staffMember) async {
-    final pinCtrl = TextEditingController();
-    bool submitting = false;
-    String? err;
-
-    await showDialog(
+    final success = await showDialog<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-          builder: (ctx, ss) => AlertDialog(
-                title: Text('Set PIN — ${staffMember['full_name']}'),
-                content: Column(mainAxisSize: MainAxisSize.min, children: [
-                  const Text(
-                      'Staff can use this 4–6 digit PIN to sign in instead of password.',
-                      style: TextStyle(
-                          color: AppColors.textSecondary, fontSize: 13)),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: pinCtrl,
-                    keyboardType: TextInputType.number,
-                    maxLength: 6,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    obscureText: true,
-                    style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 20,
-                        letterSpacing: 8,
-                        fontWeight: FontWeight.w700),
-                    textAlign: TextAlign.center,
-                    decoration: InputDecoration(
-                      hintText: '••••',
-                      hintStyle: const TextStyle(color: AppColors.textMuted),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                      counterText: '',
-                    ),
-                  ),
-                  if (err != null) ...[
-                    const SizedBox(height: 8),
-                    Text(err!,
-                        style:
-                            const TextStyle(color: AppColors.red, fontSize: 12))
-                  ],
-                ]),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Cancel')),
-                  TextButton(
-                    onPressed: submitting
-                        ? null
-                        : () async {
-                            if (pinCtrl.text.length < 4) {
-                              ss(() => err = 'PIN must be 4–6 digits');
-                              return;
-                            }
-                            ss(() {
-                              submitting = true;
-                              err = null;
-                            });
-                            try {
-                              final db = TenantService.instance.client;
-                              // Call edge function to hash and save PIN
-                              await db.functions.invoke('set-user-pin', body: {
-                                'user_id': staffMember['id'],
-                                'pin': pinCtrl.text,
-                              });
-                              if (ctx.mounted) {
-                                Navigator.pop(ctx);
-                              }
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content: Text('✅ PIN set successfully'),
-                                        backgroundColor: AppColors.green));
-                              }
-                            } catch (e) {
-                              ss(() {
-                                submitting = false;
-                                err = 'Failed to set PIN. Try again.';
-                              });
-                            }
-                          },
-                    child: submitting
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Text('Set PIN',
-                            style: TextStyle(color: AppColors.blue)),
-                  ),
-                ],
-              )),
+      builder: (ctx) => SetPinDialog(staffMember: staffMember),
     );
-    pinCtrl.dispose();
+
+    if (success == true) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('✅ PIN set successfully'),
+            backgroundColor: AppColors.green));
+      }
+    }
   }
 
   // ── Toggle Active ────────────────────────────────────────────────────────────
@@ -620,8 +262,16 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
         'resolved_by_id': ref.read(currentUserProvider)!.id,
       }).eq('id', req['id']);
       if (approve) {
-        await db.from('User').update({'active': false, 'updated_at': now}).eq(
-            'id', (req['target_user'] as Map)['id']);
+        final targetList = req['target_user'] as List?;
+        final targetUser = targetList != null && targetList.isNotEmpty
+            ? targetList.first as Map<String, dynamic>
+            : null;
+        final tid = targetUser?['id'] ?? req['target_user_id'];
+
+        await db
+            .from('User')
+            .update({'active': false, 'updated_at': now})
+            .eq('id', tid);
       }
       _fetch();
       if (mounted) {
@@ -688,20 +338,32 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
                                           CrossAxisAlignment.start,
                                       children: [
                                     Text(
-                                        'User: ${req['target_user_id']?.toString().substring(0, 8) ?? ''}...',
+                                        'User: ${req['target_user'] is List && (req['target_user'] as List).isNotEmpty ? (req['target_user'] as List).first['full_name'] : (req['target_user_id']?.toString().substring(0, 8) ?? '')}',
                                         style: const TextStyle(
                                             color: AppColors.textPrimary,
                                             fontWeight: FontWeight.w600)),
-                                    Text(
-                                        'Requested: ${req['created_at']?.toString().substring(0, 10) ?? ''}',
-                                        style: const TextStyle(
-                                            color: AppColors.textMuted,
-                                            fontSize: 12)),
-                                    if (req['reason'] != null)
-                                      Text(req['reason'] as String,
+                                    if (req['requested_by'] is List &&
+                                        (req['requested_by'] as List)
+                                            .isNotEmpty)
+                                      Text(
+                                          'Requested by: ${(req['requested_by'] as List).first['full_name']}',
                                           style: const TextStyle(
                                               color: AppColors.textSecondary,
-                                              fontSize: 12)),
+                                              fontSize: 11)),
+                                    Text(
+                                        'Date: ${req['created_at']?.toString().substring(0, 10) ?? ''}',
+                                        style: const TextStyle(
+                                            color: AppColors.textMuted,
+                                            fontSize: 11)),
+                                    if (req['reason'] != null)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Text('Reason: ${req['reason']}',
+                                            style: const TextStyle(
+                                                color: AppColors.textSecondary,
+                                                fontSize: 12,
+                                                fontStyle: FontStyle.italic)),
+                                      ),
                                   ])),
                               TextButton(
                                   onPressed: () => _resolveArchive(req, true),
@@ -788,7 +450,11 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
                       final s = filtered[i] as Map<String, dynamic>;
                       final isActive = s['active'] as bool? ?? true;
                       final role = s['role'] as String? ?? '';
-                      final config = s['salary_config'] as Map?;
+                      final _configs =
+                          (s['salary_config'] as List?) ?? const [];
+                      final config = _configs.isNotEmpty
+                          ? _configs.first as Map<String, dynamic>
+                          : null;
                       final salary = config != null
                           ? double.tryParse(
                                   config['base_monthly_salary']?.toString() ??
@@ -909,7 +575,6 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
     );
   }
 
-  String _uuid() => const Uuid().v4();
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -1015,4 +680,404 @@ class _ActionBtn extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             minimumSize: Size.zero),
       );
+}
+
+// ── Modals ───────────────────────────────────────────────────────────────────
+
+class StaffFormSheet extends ConsumerStatefulWidget {
+  final Map<String, dynamic>? existing;
+  final List<dynamic> existingStaff;
+  const StaffFormSheet({super.key, this.existing, required this.existingStaff});
+  @override
+  ConsumerState<StaffFormSheet> createState() => _StaffFormSheetState();
+}
+
+class _StaffFormSheetState extends ConsumerState<StaffFormSheet> {
+  late final bool isEdit;
+  late final TextEditingController nameCtrl;
+  late final TextEditingController phoneCtrl;
+  late final TextEditingController passCtrl;
+  late final TextEditingController empIdCtrl;
+  late final TextEditingController usernameCtrl;
+  late final TextEditingController salaryCtrl;
+  late String role;
+
+  bool submitting = false;
+  String? err;
+
+  @override
+  void initState() {
+    super.initState();
+    isEdit = widget.existing != null;
+    nameCtrl = TextEditingController(
+        text: widget.existing?['full_name'] as String? ?? '');
+    phoneCtrl = TextEditingController(
+        text: widget.existing?['phone_number'] as String? ?? '');
+    passCtrl = TextEditingController();
+    empIdCtrl = TextEditingController(
+        text: widget.existing?['employee_id'] as String? ?? '');
+    usernameCtrl = TextEditingController(
+        text: widget.existing?['username'] as String? ?? '');
+
+    final existingConfigs =
+        (widget.existing?['salary_config'] as List?) ?? const [];
+    final existingConfig = existingConfigs.isNotEmpty
+        ? existingConfigs.first as Map<String, dynamic>
+        : null;
+    salaryCtrl = TextEditingController(
+        text: existingConfig?['base_monthly_salary']?.toString() ?? '');
+    role = widget.existing?['role'] as String? ?? 'PUMP_PERSON';
+
+    if (!isEdit) {
+      empIdCtrl.text =
+          StaffManagementScreen.suggestEmployeeId(widget.existingStaff, role);
+      onNameOrIdChanged();
+    }
+  }
+
+  @override
+  void dispose() {
+    nameCtrl.dispose();
+    phoneCtrl.dispose();
+    passCtrl.dispose();
+    empIdCtrl.dispose();
+    usernameCtrl.dispose();
+    salaryCtrl.dispose();
+    super.dispose();
+  }
+
+  void onNameOrIdChanged() {
+    if (!isEdit) {
+      usernameCtrl.text =
+          StaffManagementScreen.deriveUsername(nameCtrl.text, empIdCtrl.text);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+          20, 20, 20, MediaQuery.viewInsetsOf(context).bottom + 24),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(isEdit ? Icons.edit_outlined : Icons.person_add_alt,
+              color: AppColors.blue, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+              child: Text(isEdit ? 'Edit Staff Member' : 'Add Staff Member',
+                  style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700))),
+          IconButton(
+              icon: const Icon(Icons.close,
+                  size: 20, color: AppColors.textMuted),
+              onPressed: () => Navigator.pop(context)),
+        ]),
+        const SizedBox(height: 20),
+
+        // Role selector
+        const Text('ROLE',
+            style: TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1)),
+        const SizedBox(height: 8),
+        Row(
+            children: ['MANAGER', 'PUMP_PERSON'].map((r) {
+          final sel = role == r;
+          final label = r == 'MANAGER' ? 'Manager' : 'Staff / Pump Person';
+          final color = r == 'MANAGER' ? AppColors.blue : AppColors.green;
+          return Expanded(
+              child: GestureDetector(
+            onTap: () {
+              setState(() {
+                role = r;
+                if (!isEdit) {
+                  empIdCtrl.text = StaffManagementScreen.suggestEmployeeId(
+                      widget.existingStaff, r);
+                }
+                onNameOrIdChanged();
+              });
+            },
+            child: Container(
+              margin: EdgeInsets.only(right: r == 'MANAGER' ? 8 : 0),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                  color: sel ? color.withValues(alpha: 0.15) : AppColors.bgCard,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: sel ? color : AppColors.border,
+                      width: sel ? 1.5 : 1)),
+              alignment: Alignment.center,
+              child: Text(label,
+                  style: TextStyle(
+                      color: sel ? color : AppColors.textSecondary,
+                      fontWeight: sel ? FontWeight.w700 : FontWeight.w400,
+                      fontSize: 13)),
+            ),
+          ));
+        }).toList()),
+        const SizedBox(height: 16),
+
+        _Field(
+            label: 'Full Name *',
+            ctrl: nameCtrl,
+            capitalize: TextCapitalization.words,
+            onChanged: (_) => setState(onNameOrIdChanged)),
+        const SizedBox(height: 12),
+        _Field(
+            label: 'Mobile Number *',
+            ctrl: phoneCtrl,
+            keyboard: TextInputType.phone),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(
+              child: _Field(
+                  label: 'Employee ID',
+                  ctrl: empIdCtrl,
+                  capitalize: TextCapitalization.characters,
+                  onChanged: (_) => setState(onNameOrIdChanged))),
+          const SizedBox(width: 8),
+          Expanded(child: _Field(label: 'Username', ctrl: usernameCtrl)),
+        ]),
+        const SizedBox(height: 12),
+        _Field(
+            label: 'Base Salary (₹/month)',
+            ctrl: salaryCtrl,
+            keyboard: const TextInputType.numberWithOptions(decimal: true)),
+        const SizedBox(height: 12),
+        _Field(
+            label: isEdit ? 'New Password (leave blank to keep)' : 'Password *',
+            ctrl: passCtrl,
+            obscure: true),
+        const SizedBox(height: 4),
+        const Text(
+            'Staff can also login with PIN — set it separately after creation',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
+
+        if (err != null) ...[
+          const SizedBox(height: 12),
+          Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                  color: AppColors.redBg,
+                  borderRadius: BorderRadius.circular(8)),
+              child: Text(err!,
+                  style: const TextStyle(color: AppColors.red, fontSize: 12))),
+        ],
+        const SizedBox(height: 20),
+        AppButton(
+          label: isEdit ? 'Save Changes' : 'Create Staff Member',
+          loading: submitting,
+          width: double.infinity,
+          onTap: () async {
+            if (nameCtrl.text.trim().isEmpty || phoneCtrl.text.trim().isEmpty) {
+              setState(() => err = 'Name and phone number are required');
+              return;
+            }
+            if (!isEdit && passCtrl.text.isEmpty) {
+              setState(() => err = 'Password is required for new staff');
+              return;
+            }
+            setState(() {
+              submitting = true;
+              err = null;
+            });
+            try {
+              final db = TenantService.instance.client;
+              final user = ref.read(currentUserProvider)!;
+              final now = DateTime.now().toUtc().toIso8601String();
+              final salary = double.tryParse(salaryCtrl.text) ?? 0;
+
+              if (isEdit) {
+                await db.from('User').update({
+                  'full_name': nameCtrl.text.trim(),
+                  'phone_number': phoneCtrl.text.trim(),
+                  'employee_id': empIdCtrl.text.trim().isEmpty
+                      ? null
+                      : empIdCtrl.text.trim(),
+                  'username': usernameCtrl.text.trim().isEmpty
+                      ? null
+                      : usernameCtrl.text.trim(),
+                  'role': role,
+                  'updated_at': now,
+                  if (passCtrl.text.isNotEmpty) 'password_hash': passCtrl.text,
+                }).eq('id', widget.existing!['id']);
+
+                if (salary > 0) {
+                  await db.from('SalaryConfig').upsert({
+                    'station_id': user.stationId,
+                    'user_id': widget.existing!['id'],
+                    'base_monthly_salary': salary,
+                    'updated_at': now,
+                  }, onConflict: 'user_id');
+                }
+              } else {
+                final resp = await db.functions.invoke('create-staff', body: {
+                  'full_name': nameCtrl.text.trim(),
+                  'phone_number': phoneCtrl.text.trim(),
+                  'employee_id': empIdCtrl.text.trim().isEmpty
+                      ? null
+                      : empIdCtrl.text.trim(),
+                  'username': usernameCtrl.text.trim().isEmpty
+                      ? null
+                      : usernameCtrl.text.trim(),
+                  'role': role,
+                  'password': passCtrl.text,
+                  'station_id': user.stationId,
+                  'base_salary_snapshot': salary,
+                  'created_by': user.id,
+                });
+
+                if (resp.status != 200) {
+                  final newUserId = const Uuid().v4();
+                  await db.from('User').insert({
+                    'id': newUserId,
+                    'station_id': user.stationId,
+                    'full_name': nameCtrl.text.trim(),
+                    'phone_number': phoneCtrl.text.trim(),
+                    'employee_id': empIdCtrl.text.trim().isEmpty
+                        ? null
+                        : empIdCtrl.text.trim(),
+                    'username': usernameCtrl.text.trim().isEmpty
+                        ? null
+                        : usernameCtrl.text.trim(),
+                    'role': role,
+                    'password_hash': passCtrl.text,
+                    'active': true,
+                    'created_by_id': user.id,
+                    'created_at': now,
+                    'updated_at': now,
+                  });
+                  if (salary > 0) {
+                    await db.from('SalaryConfig').insert({
+                      'station_id': user.stationId,
+                      'user_id': newUserId,
+                      'base_monthly_salary': salary,
+                      'created_by': user.id,
+                      'created_at': now,
+                      'updated_at': now,
+                    });
+                  }
+                }
+              }
+
+              await DiscordService.instance.sendStaffChange(
+                action: isEdit ? 'Updated' : 'Created',
+                staffName: nameCtrl.text.trim(),
+                role: role,
+                stationName: ref.read(stationNameProvider),
+              );
+
+              if (mounted) Navigator.pop(context, true);
+            } catch (e) {
+              if (mounted) {
+                setState(() {
+                  submitting = false;
+                  err = e.toString().replaceAll('Exception: ', '');
+                });
+              }
+            }
+          },
+        ),
+      ]),
+    );
+  }
+}
+
+class SetPinDialog extends ConsumerStatefulWidget {
+  final Map<String, dynamic> staffMember;
+  const SetPinDialog({super.key, required this.staffMember});
+  @override
+  ConsumerState<SetPinDialog> createState() => _SetPinDialogState();
+}
+
+class _SetPinDialogState extends ConsumerState<SetPinDialog> {
+  final pinCtrl = TextEditingController();
+  bool submitting = false;
+  String? err;
+
+  @override
+  void dispose() {
+    pinCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Set PIN — ${widget.staffMember['full_name']}'),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Text(
+            'Staff can use this 4–6 digit PIN to sign in instead of password.',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+        const SizedBox(height: 16),
+        TextField(
+          controller: pinCtrl,
+          keyboardType: TextInputType.number,
+          maxLength: 6,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          obscureText: true,
+          style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 20,
+              letterSpacing: 8,
+              fontWeight: FontWeight.w700),
+          textAlign: TextAlign.center,
+          decoration: InputDecoration(
+            hintText: '••••',
+            hintStyle: const TextStyle(color: AppColors.textMuted),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            counterText: '',
+          ),
+        ),
+        if (err != null) ...[
+          const SizedBox(height: 8),
+          Text(err!, style: const TextStyle(color: AppColors.red, fontSize: 12))
+        ],
+      ]),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel')),
+        TextButton(
+          onPressed: submitting
+              ? null
+              : () async {
+                  if (pinCtrl.text.length < 4) {
+                    setState(() => err = 'PIN must be 4–6 digits');
+                    return;
+                  }
+                  setState(() {
+                    submitting = true;
+                    err = null;
+                  });
+                  try {
+                    final db = TenantService.instance.client;
+                    await db.functions.invoke('set-user-pin', body: {
+                      'user_id': widget.staffMember['id'],
+                      'pin': pinCtrl.text,
+                    });
+                    if (mounted) Navigator.pop(context, true);
+                  } catch (e) {
+                    if (mounted) {
+                      setState(() {
+                        submitting = false;
+                        err = 'Failed to set PIN. Try again.';
+                      });
+                    }
+                  }
+                },
+          child: submitting
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Set PIN', style: TextStyle(color: AppColors.blue)),
+        ),
+      ],
+    );
+  }
 }

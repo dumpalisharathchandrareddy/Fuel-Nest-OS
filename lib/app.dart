@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -24,14 +25,10 @@ import 'features/worker/screens/worker_home_screen.dart';
 final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final _shellKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
 
-GoRouter? _instance;
-
 final routerProvider = Provider<GoRouter>((ref) {
-  if (_instance != null) return _instance!;
-
   final notifier = ref.read(routerNotifierProvider);
 
-  _instance = GoRouter(
+  return GoRouter(
     navigatorKey: _rootKey,
     initialLocation: '/splash',
     refreshListenable: notifier,
@@ -42,8 +39,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       final stationSet = auth.stationConfigured;
       final loc = state.matchedLocation;
 
-      debugPrint(
-          'ROUTER REDIRECT: loc=$loc, stationSet=$stationSet, loggedIn=$loggedIn');
+      if (kDebugMode) {
+        debugPrint(
+            'ROUTER REDIRECT: loc=$loc, stationSet=$stationSet, loggedIn=$loggedIn');
+      }
 
       if (loc == '/splash') {
         if (auth.isLoading) return null;
@@ -154,7 +153,6 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
 
-  return _instance!;
 });
 
 NoTransitionPage<void> _noTransition(Widget child) =>
@@ -168,7 +166,9 @@ final routerNotifierProvider = ChangeNotifierProvider<_RouterNotifier>((ref) {
 
 class _RouterNotifier extends ChangeNotifier {
   void trigger() {
-    debugPrint('ROUTER: Notifier triggered by auth change');
+    if (kDebugMode) {
+      debugPrint('ROUTER: Notifier triggered by auth change');
+    }
     notifyListeners();
   }
 }

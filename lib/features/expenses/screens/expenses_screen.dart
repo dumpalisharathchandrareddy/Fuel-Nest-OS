@@ -58,7 +58,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
       var query = db
           .from('DailyExpense')
           .select(
-              'id, category, custom_category, name, amount, expense_date, description, vendor_name, is_system_generated, created_at, recorder:User(full_name)')
+              'id, category, custom_category, name, amount, expense_date, description, vendor_name, is_system_generated, created_at, recorder:User!DailyExpense_recorded_by_fkey(full_name)')
           .eq('station_id', user.stationId)
           .isFilter('deleted_at', null);
 
@@ -123,266 +123,24 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
   }
 
   Future<void> _showAddExpense({Map<String, dynamic>? existing}) async {
-    final isEdit = existing != null;
-    String category = existing?['category'] as String? ?? 'misc';
-    final nameCtrl = TextEditingController(
-        text: existing?['name'] as String? ?? _catLabel(category));
-    final amtCtrl =
-        TextEditingController(text: existing?['amount']?.toString() ?? '');
-    final descCtrl =
-        TextEditingController(text: existing?['description'] as String? ?? '');
-    final vendorCtrl =
-        TextEditingController(text: existing?['vendor_name'] as String? ?? '');
-    final customCatCtrl = TextEditingController(
-        text: existing?['custom_category'] as String? ?? '');
-    DateTime expDate = existing != null
-        ? DateTime.tryParse(existing['expense_date'] as String? ?? '') ??
-            DateTime.now()
-        : DateTime.now();
-    bool submitting = false;
-    String? err;
-
-    await showModalBottomSheet(
+    final success = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.bgSurface,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) => StatefulBuilder(
-          builder: (ctx, ss) => SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(
-                    20, 20, 20, MediaQuery.viewInsetsOf(ctx).bottom + 24),
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(children: [
-                        Icon(
-                            isEdit
-                                ? Icons.edit_outlined
-                                : Icons.add_circle_outline,
-                            color: AppColors.blue,
-                            size: 22),
-                        const SizedBox(width: 10),
-                        Expanded(
-                            child: Text(isEdit ? 'Edit Expense' : 'Add Expense',
-                                style: const TextStyle(
-                                    color: AppColors.textPrimary,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700))),
-                        IconButton(
-                            icon: const Icon(Icons.close,
-                                size: 20, color: AppColors.textMuted),
-                            onPressed: () => Navigator.pop(ctx)),
-                      ]),
-                      const SizedBox(height: 16),
-
-                      // Category picker
-                      const Text('CATEGORY',
-                          style: TextStyle(
-                              color: AppColors.textMuted,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1)),
-                      const SizedBox(height: 8),
-                      Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: _kCategories.map((cat) {
-                            final (key, label, icon, color) = cat;
-                            final sel = category == key;
-                            return GestureDetector(
-                              onTap: () {
-                                ss(() {
-                                  category = key;
-                                  if (key != 'custom') nameCtrl.text = label;
-                                });
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 7),
-                                decoration: BoxDecoration(
-                                    color: sel
-                                        ? color.withValues(alpha: 0.15)
-                                        : AppColors.bgCard,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                        color: sel ? color : AppColors.border,
-                                        width: sel ? 1.5 : 1)),
-                                child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(icon,
-                                          size: 14,
-                                          color: sel
-                                              ? color
-                                              : AppColors.textMuted),
-                                      const SizedBox(width: 4),
-                                      Text(label,
-                                          style: TextStyle(
-                                              color: sel
-                                                  ? color
-                                                  : AppColors.textSecondary,
-                                              fontSize: 12,
-                                              fontWeight: sel
-                                                  ? FontWeight.w600
-                                                  : FontWeight.w400)),
-                                    ]),
-                              ),
-                            );
-                          }).toList()),
-
-                      if (category == 'custom') ...[
-                        const SizedBox(height: 12),
-                        _TF(
-                            label: 'Custom Category Name',
-                            ctrl: customCatCtrl,
-                            capitalize: TextCapitalization.words),
-                      ],
-                      const SizedBox(height: 12),
-                      _TF(
-                          label: 'Expense Name',
-                          ctrl: nameCtrl,
-                          capitalize: TextCapitalization.sentences),
-                      const SizedBox(height: 12),
-                      _TF(
-                          label: 'Amount (₹) *',
-                          ctrl: amtCtrl,
-                          keyboard: const TextInputType.numberWithOptions(
-                              decimal: true)),
-                      const SizedBox(height: 12),
-                      Row(children: [
-                        Expanded(
-                            child: _TF(
-                                label: 'Vendor / Supplier',
-                                ctrl: vendorCtrl,
-                                capitalize: TextCapitalization.words)),
-                        const SizedBox(width: 8),
-                        Expanded(
-                            child: GestureDetector(
-                          onTap: () async {
-                            final d = await showDatePicker(
-                                context: context,
-                                initialDate: expDate,
-                                firstDate: DateTime(2020),
-                                lastDate: DateTime.now());
-                            if (d != null) ss(() => expDate = d);
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 16),
-                            decoration: BoxDecoration(
-                                color: AppColors.bgCard,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: AppColors.border)),
-                            child: Row(children: [
-                              const Icon(Icons.calendar_today,
-                                  size: 16, color: AppColors.textMuted),
-                              const SizedBox(width: 8),
-                              Text(IstTime.formatShortDate(expDate),
-                                  style: const TextStyle(
-                                      color: AppColors.textPrimary,
-                                      fontSize: 13)),
-                            ]),
-                          ),
-                        )),
-                      ]),
-                      const SizedBox(height: 12),
-                      _TF(
-                          label: 'Notes (optional)',
-                          ctrl: descCtrl,
-                          maxLines: 2),
-
-                      if (err != null) ...[
-                        const SizedBox(height: 10),
-                        Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                                color: AppColors.redBg,
-                                borderRadius: BorderRadius.circular(8)),
-                            child: Text(err!,
-                                style: const TextStyle(
-                                    color: AppColors.red, fontSize: 12))),
-                      ],
-                      const SizedBox(height: 20),
-                      AppButton(
-                        label: isEdit ? 'Save Changes' : 'Add Expense',
-                        loading: submitting,
-                        width: double.infinity,
-                        onTap: () async {
-                          final amt =
-                              double.tryParse(amtCtrl.text.replaceAll(',', ''));
-                          if (amt == null || amt <= 0) {
-                            ss(() => err = 'Enter a valid amount');
-                            return;
-                          }
-                          ss(() {
-                            submitting = true;
-                            err = null;
-                          });
-                          try {
-                            final db = TenantService.instance.client;
-                            final user = ref.read(currentUserProvider)!;
-                            final now =
-                                DateTime.now().toUtc().toIso8601String();
-                            final payload = {
-                              'station_id': user.stationId,
-                              'category': category,
-                              'custom_category': category == 'custom'
-                                  ? customCatCtrl.text.trim()
-                                  : null,
-                              'name': nameCtrl.text.trim().isEmpty
-                                  ? _catLabel(category)
-                                  : nameCtrl.text.trim(),
-                              'amount': amt,
-                              'description': descCtrl.text.trim().isEmpty
-                                  ? null
-                                  : descCtrl.text.trim(),
-                              'vendor_name': vendorCtrl.text.trim().isEmpty
-                                  ? null
-                                  : vendorCtrl.text.trim(),
-                              'expense_date':
-                                  '${expDate.year}-${expDate.month.toString().padLeft(2, '0')}-${expDate.day.toString().padLeft(2, '0')}T00:00:00.000Z',
-                              'business_date':
-                                  '${expDate.year}-${expDate.month.toString().padLeft(2, '0')}-${expDate.day.toString().padLeft(2, '0')}T00:00:00.000Z',
-                              'recorded_at': now,
-                              'is_system_generated': false,
-                              'recorded_by': user
-                                  .id, // DailyExpense.recorded_by = user_id directly
-                              'updated_at': now,
-                            };
-                            if (isEdit) {
-                              await db
-                                  .from('DailyExpense')
-                                  .update(payload)
-                                  .eq('id', existing['id']);
-                            } else {
-                              await db
-                                  .from('DailyExpense')
-                                  .insert({...payload, 'created_at': now});
-                            }
-                            if (ctx.mounted) Navigator.pop(ctx);
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                      content: Text(isEdit
-                                          ? '✅ Expense updated'
-                                          : '✅ Expense added'),
-                                      backgroundColor: AppColors.green));
-                              _fetch();
-                            }
-                          } catch (e) {
-                            ss(() {
-                              submitting = false;
-                              err = e.toString();
-                            });
-                          }
-                        },
-                      ),
-                    ]),
-              )),
+      builder: (ctx) => ExpenseFormSheet(existing: existing),
     );
-    for (final c in [nameCtrl, amtCtrl, descCtrl, vendorCtrl, customCatCtrl]) {
-      c.dispose();
+
+    if (success == true) {
+      _fetch();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(existing != null
+                ? '✅ Expense updated'
+                : '✅ Expense added'),
+            backgroundColor: AppColors.green));
+      }
     }
   }
 
@@ -848,5 +606,261 @@ class _CatChip extends StatelessWidget {
                       fontSize: 11,
                       fontWeight: sel ? FontWeight.w600 : FontWeight.w400))
             ])));
+  }
+}
+
+// ── Modals ───────────────────────────────────────────────────────────────────
+
+class ExpenseFormSheet extends ConsumerStatefulWidget {
+  final Map<String, dynamic>? existing;
+  const ExpenseFormSheet({super.key, this.existing});
+  @override
+  ConsumerState<ExpenseFormSheet> createState() => _ExpenseFormSheetState();
+}
+
+class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
+  late String category;
+  late final TextEditingController nameCtrl;
+  late final TextEditingController amtCtrl;
+  late final TextEditingController descCtrl;
+  late final TextEditingController vendorCtrl;
+  late final TextEditingController customCatCtrl;
+  late DateTime expDate;
+  bool submitting = false;
+  String? err;
+
+  @override
+  void initState() {
+    super.initState();
+    final existing = widget.existing;
+    category = existing?['category'] as String? ?? 'misc';
+    nameCtrl = TextEditingController(
+        text: existing?['name'] as String? ?? _catLabel(category));
+    amtCtrl =
+        TextEditingController(text: existing?['amount']?.toString() ?? '');
+    descCtrl =
+        TextEditingController(text: existing?['description'] as String? ?? '');
+    vendorCtrl =
+        TextEditingController(text: existing?['vendor_name'] as String? ?? '');
+    customCatCtrl = TextEditingController(
+        text: existing?['custom_category'] as String? ?? '');
+    expDate = existing != null
+        ? DateTime.tryParse(existing['expense_date'] as String? ?? '') ??
+            DateTime.now()
+        : DateTime.now();
+  }
+
+  @override
+  void dispose() {
+    nameCtrl.dispose();
+    amtCtrl.dispose();
+    descCtrl.dispose();
+    vendorCtrl.dispose();
+    customCatCtrl.dispose();
+    super.dispose();
+  }
+
+  String _catLabel(String key) {
+    for (final (k, l, _, __) in _kCategories) {
+      if (k == key) return l;
+    }
+    return key;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isEdit = widget.existing != null;
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+          20, 20, 20, MediaQuery.viewInsetsOf(context).bottom + 24),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(isEdit ? Icons.edit_outlined : Icons.add_circle_outline,
+              color: AppColors.blue, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+              child: Text(isEdit ? 'Edit Expense' : 'Add Expense',
+                  style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700))),
+          IconButton(
+              icon: const Icon(Icons.close,
+                  size: 20, color: AppColors.textMuted),
+              onPressed: () => Navigator.pop(context)),
+        ]),
+        const SizedBox(height: 16),
+        const Text('CATEGORY',
+            style: TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1)),
+        const SizedBox(height: 8),
+        Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: _kCategories.map((cat) {
+              final (key, label, icon, color) = cat;
+              final sel = category == key;
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    category = key;
+                    if (key != 'custom') nameCtrl.text = label;
+                  });
+                },
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                      color: sel ? color.withValues(alpha: 0.15) : AppColors.bgCard,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: sel ? color : AppColors.border,
+                          width: sel ? 1.5 : 1)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(icon,
+                        size: 14, color: sel ? color : AppColors.textMuted),
+                    const SizedBox(width: 4),
+                    Text(label,
+                        style: TextStyle(
+                            color: sel ? color : AppColors.textSecondary,
+                            fontSize: 12,
+                            fontWeight:
+                                sel ? FontWeight.w600 : FontWeight.w400)),
+                  ]),
+                ),
+              );
+            }).toList()),
+        if (category == 'custom') ...[
+          const SizedBox(height: 12),
+          _TF(
+              label: 'Custom Category Name',
+              ctrl: customCatCtrl,
+              capitalize: TextCapitalization.words),
+        ],
+        const SizedBox(height: 12),
+        _TF(
+            label: 'Expense Name',
+            ctrl: nameCtrl,
+            capitalize: TextCapitalization.sentences),
+        const SizedBox(height: 12),
+        _TF(
+            label: 'Amount (₹) *',
+            ctrl: amtCtrl,
+            keyboard: const TextInputType.numberWithOptions(decimal: true)),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(
+              child: _TF(
+                  label: 'Vendor / Supplier',
+                  ctrl: vendorCtrl,
+                  capitalize: TextCapitalization.words)),
+          const SizedBox(width: 8),
+          Expanded(
+              child: GestureDetector(
+            onTap: () async {
+              final d = await showDatePicker(
+                  context: context,
+                  initialDate: expDate,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now());
+              if (d != null) setState(() => expDate = d);
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+              decoration: BoxDecoration(
+                  color: AppColors.bgCard,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.border)),
+              child: Row(children: [
+                const Icon(Icons.calendar_today,
+                    size: 16, color: AppColors.textMuted),
+                const SizedBox(width: 8),
+                Text(IstTime.formatShortDate(expDate),
+                    style: const TextStyle(
+                        color: AppColors.textPrimary, fontSize: 13)),
+              ]),
+            ),
+          )),
+        ]),
+        const SizedBox(height: 12),
+        _TF(label: 'Notes (optional)', ctrl: descCtrl, maxLines: 2),
+        if (err != null) ...[
+          const SizedBox(height: 10),
+          Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                  color: AppColors.redBg,
+                  borderRadius: BorderRadius.circular(8)),
+              child: Text(err!,
+                  style: const TextStyle(color: AppColors.red, fontSize: 12))),
+        ],
+        const SizedBox(height: 20),
+        AppButton(
+          label: isEdit ? 'Save Changes' : 'Add Expense',
+          loading: submitting,
+          width: double.infinity,
+          onTap: () async {
+            final amt = double.tryParse(amtCtrl.text.replaceAll(',', ''));
+            if (amt == null || amt <= 0) {
+              setState(() => err = 'Enter a valid amount');
+              return;
+            }
+            setState(() {
+              submitting = true;
+              err = null;
+            });
+            try {
+              final db = TenantService.instance.client;
+              final user = ref.read(currentUserProvider)!;
+              final now = DateTime.now().toUtc().toIso8601String();
+              final payload = {
+                'station_id': user.stationId,
+                'category': category,
+                'custom_category':
+                    category == 'custom' ? customCatCtrl.text.trim() : null,
+                'name': nameCtrl.text.trim().isEmpty
+                    ? _catLabel(category)
+                    : nameCtrl.text.trim(),
+                'amount': amt,
+                'description':
+                    descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
+                'vendor_name': vendorCtrl.text.trim().isEmpty
+                    ? null
+                    : vendorCtrl.text.trim(),
+                'expense_date':
+                    '${expDate.year}-${expDate.month.toString().padLeft(2, '0')}-${expDate.day.toString().padLeft(2, '0')}T00:00:00.000Z',
+                'business_date':
+                    '${expDate.year}-${expDate.month.toString().padLeft(2, '0')}-${expDate.day.toString().padLeft(2, '0')}T00:00:00.000Z',
+                'recorded_at': now,
+                'is_system_generated': false,
+                'recorded_by': user.id,
+                'updated_at': now,
+              };
+              if (isEdit) {
+                await db
+                    .from('DailyExpense')
+                    .update(payload)
+                    .eq('id', widget.existing!['id']);
+              } else {
+                await db
+                    .from('DailyExpense')
+                    .insert({...payload, 'created_at': now});
+              }
+              if (mounted) Navigator.pop(context, true);
+            } catch (e) {
+              if (mounted) {
+                setState(() {
+                  submitting = false;
+                  err = e.toString();
+                });
+              }
+            }
+          },
+        ),
+      ]),
+    );
   }
 }

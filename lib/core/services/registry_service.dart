@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/app_constants.dart';
 import '../models/auth_user.dart';
@@ -42,6 +43,9 @@ class RegistryService {
 
   /// Register a new dealer station in the central registry.
   /// Called during dealer signup flow.
+  /// Calls the register-station Edge Function deployed to the central registry
+  /// project (manuhbjwasbpbuggkhgq). The function uses service role server-side
+  /// to bypass RLS — the anon key cannot INSERT into station_registry directly.
   Future<void> registerStation({
     required String stationCode,
     required String stationName,
@@ -49,16 +53,34 @@ class RegistryService {
     required String anonKey,
   }) async {
     try {
-      await _registry.from('station_registry').upsert({
-        'station_code': stationCode.trim().toUpperCase(),
-        'station_name': stationName.trim(),
-        'supabase_url': supabaseUrl.trim(),
-        'anon_key': anonKey.trim(),
-        'active': true,
-        'registered_at': DateTime.now().toUtc().toIso8601String(),
-      });
-    } on PostgrestException catch (e) {
-      throw Exception('Failed to register station: ${e.message}');
+      final response = await _registry.functions.invoke(
+        'register-station',
+        body: {
+          'station_code': stationCode.trim().toUpperCase(),
+          'station_name': stationName.trim(),
+          'supabase_url': supabaseUrl.trim(),
+          'anon_key': anonKey.trim(),
+        },
+      );
+      final raw = response.data;
+      debugPrint('register-station response.data=${raw.toString()} type=${raw.runtimeType}');
+      if (raw == null) {
+        throw Exception('Registry function returned empty response');
+      }
+      if (raw is! Map) {
+        throw Exception(
+          'Unexpected registry response type: ${raw.runtimeType}',
+        );
+      }
+      final data = Map<String, dynamic>.from(raw);
+      if (data['success'] != true) {
+        throw Exception(
+          'Failed to register station: ${data['error'] ?? 'unknown error'}',
+        );
+      }
+    } on FunctionException catch (e) {
+      final detail = e.details?.toString() ?? e.toString();
+      throw Exception('Failed to register station: $detail');
     }
   }
 

@@ -5,7 +5,6 @@
 *.swp
 *.tmp
 *.temp
-*.lock
 *.bak
 *.orig
 .DS_Store
@@ -106,9 +105,8 @@ lcov.info
 *.so
 *.keystore
 
-# Supabase/Backend migrations
-supabase/migrations/
-registry_supabase/migrations/
+# Supabase/Backend
+# Migrations are tracked via Git
 
 # XML files (local config)
 android/app/*.xml
@@ -121,9 +119,10 @@ gradle/app/build
 gradle/build
 
 # JSON local configs
-*.json
+!package.json
+!package-lock.json
 !pubspec.yaml
-analysis_options.yaml
+!analysis_options.yaml
 fuelos.iml
 
 # FVM (Flutter Version Manager)
@@ -172,3 +171,9 @@ windows/runner/flutter_window.h
 # Android build folder
 android/app/build/
 android/build/
+
+# Node/JS/Tools
+node_modules/
+.claude/
+graphify-out/
+{lib/

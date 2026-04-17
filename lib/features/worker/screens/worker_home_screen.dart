@@ -193,28 +193,39 @@ class _WorkerHomeScreenState extends ConsumerState<WorkerHomeScreen> {
                       ),
 
                       // Pump cards
-                      SliverPadding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        sliver: SliverGrid(
-                          gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount:
-                                MediaQuery.sizeOf(context).width > 500 ? 3 : 2,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                            childAspectRatio: 1.1,
+                      if (_pumps.isEmpty)
+                        const SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: EmptyView(
+                            title: 'No pumps available',
+                            subtitle:
+                                'No active pumps are assigned to this station',
+                            icon: Icons.local_gas_station_outlined,
                           ),
-                          delegate: SliverChildBuilderDelegate(
-                            (_, i) => _PumpCard(
-                              pump: _pumps[i],
-                              hasActiveShift: _activeShift != null,
-                              onTap: () => context
-                                  .go('/worker/nozzle/${_pumps[i]['id']}'),
+                        )
+                      else
+                        SliverPadding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          sliver: SliverGrid(
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount:
+                                  MediaQuery.sizeOf(context).width > 500 ? 3 : 2,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 12,
+                              childAspectRatio: 1.1,
                             ),
-                            childCount: _pumps.length,
+                            delegate: SliverChildBuilderDelegate(
+                              (_, i) => _PumpCard(
+                                pump: _pumps[i],
+                                hasActiveShift: _activeShift != null,
+                                onTap: () => context
+                                    .go('/worker/nozzle/${_pumps[i]['id']}'),
+                              ),
+                              childCount: _pumps.length,
+                            ),
                           ),
                         ),
-                      ),
                       const SliverPadding(padding: EdgeInsets.only(bottom: 24)),
                     ],
                   ),
@@ -1027,7 +1038,7 @@ class _MyEarningsScreenState extends ConsumerState<MyEarningsScreen> {
             .limit(10),
         db
             .from('SalaryPayout')
-            .select('net_pay, period_label, paid_at, status')
+            .select('net_paid, period_label, paid_at, status')
             .eq('user_id', user.id)
             .order('paid_at', ascending: false)
             .limit(6),

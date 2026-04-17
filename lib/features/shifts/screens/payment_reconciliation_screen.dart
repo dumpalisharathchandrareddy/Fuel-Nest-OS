@@ -50,7 +50,7 @@ class _PaymentReconciliationScreenState
       final shift = await db
           .from('Shift')
           .select(
-              'id, status, sale_amount, created_at, closed_at, pump:Pump(name), assigned_worker:User(full_name), nozzle_entries:NozzleEntry(id, opening_reading, closing_reading, nozzle:Nozzle(label, fuel_type)), payment_records:PaymentRecord(id, payment_mode, amount, status, mismatch_reason)')
+              'id, status, created_at, closed_at, pump:Pump(name), assigned_worker:User(full_name), nozzle_entries:NozzleEntry(id, opening_reading, closing_reading, nozzle:Nozzle(label, fuel_type)), payment_record:PaymentRecord(id, upi_amount, card_amount, credit_amount, cash_to_collect, actual_cash_collected_amount, total_sale_amount, is_balanced)')
           .eq('id', widget.shiftId)
           .single();
 
@@ -111,16 +111,17 @@ class _PaymentReconciliationScreenState
     setState(() => _submitting = true);
     try {
       final db = TenantService.instance.client;
-      final user = ref.read(currentUserProvider)!;
       final stationName = ref.read(stationNameProvider);
 
-      // Update payment records
+      // Update payment record with actual cash collected and mark balanced
       for (final p in _paymentRecords) {
         final key = p['id'] as String;
         final amount =
             double.tryParse(_amountControllers[key]?.text ?? '0') ?? 0;
-        // PaymentRecord settlement: mark as balanced
-        // (actual update logic depends on which payment type)
+        await db.from('PaymentRecord').update({
+          'actual_cash_collected_amount': amount,
+          'is_balanced': _difference.abs() < 1,
+        }).eq('id', key);
       }
 
       // Close the shift
@@ -392,9 +393,3 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-double _d(dynamic v) {
-  if (v == null) return 0.0;
-  if (v is double) return v;
-  if (v is int) return v.toDouble();
-  return double.tryParse(v.toString()) ?? 0.0;
-}

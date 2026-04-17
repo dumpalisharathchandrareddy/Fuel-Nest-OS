@@ -17,7 +17,11 @@ class _NavItem {
     required this.icon,
     required this.activeIcon,
     required this.path,
+    this.roles = const [],
   });
+
+  bool visibleFor(String? role) =>
+      roles.isEmpty || (role != null && roles.contains(role));
 }
 
 const _navItems = [
@@ -50,36 +54,42 @@ const _navItems = [
     icon: Icons.payments_outlined,
     activeIcon: Icons.payments,
     path: '/app/payroll',
+    roles: ['DEALER', 'MANAGER'],
   ),
   _NavItem(
     label: 'Staff',
     icon: Icons.people_outline,
     activeIcon: Icons.people,
     path: '/app/staff',
+    roles: ['DEALER', 'MANAGER'],
   ),
   _NavItem(
     label: 'Reports',
     icon: Icons.bar_chart_outlined,
     activeIcon: Icons.bar_chart,
     path: '/app/reports',
+    roles: ['DEALER', 'MANAGER'],
   ),
   _NavItem(
     label: 'Expenses',
     icon: Icons.receipt_long_outlined,
     activeIcon: Icons.receipt_long,
     path: '/app/expenses',
+    roles: ['DEALER', 'MANAGER'],
   ),
   _NavItem(
     label: 'Rates',
     icon: Icons.local_offer_outlined,
     activeIcon: Icons.local_offer,
     path: '/app/rates',
+    roles: ['DEALER', 'MANAGER'],
   ),
   _NavItem(
     label: 'Hardware',
     icon: Icons.settings_input_component_outlined,
     activeIcon: Icons.settings_input_component,
     path: '/app/hardware',
+    roles: ['DEALER', 'MANAGER'],
   ),
   _NavItem(
     label: 'Settings',
@@ -150,7 +160,9 @@ class _MainShellState extends ConsumerState<MainShell> {
   Widget _buildTabletLayout(BuildContext context) {
     final loc = widget.state.matchedLocation;
     final user = ref.watch(currentUserProvider);
-    final selectedIdx = _navItems.indexWhere((i) => i.path == loc);
+    final visibleItems =
+        _navItems.where((i) => i.visibleFor(user?.role)).toList();
+    final selectedIdx = visibleItems.indexWhere((i) => i.path == loc);
 
     return Scaffold(
       backgroundColor: AppColors.bgApp,
@@ -158,9 +170,9 @@ class _MainShellState extends ConsumerState<MainShell> {
         children: [
           NavigationRail(
             selectedIndex: selectedIdx < 0 ? 0 : selectedIdx,
-            onDestinationSelected: (i) => context.go(_navItems[i].path),
+            onDestinationSelected: (i) => context.go(visibleItems[i].path),
             labelType: NavigationRailLabelType.selected,
-            destinations: _navItems
+            destinations: visibleItems
                 .map((item) => NavigationRailDestination(
                       icon: Icon(item.icon),
                       selectedIcon: Icon(item.activeIcon),
@@ -185,8 +197,10 @@ class _MainShellState extends ConsumerState<MainShell> {
   Widget _buildMobileLayout(BuildContext context) {
     final loc = widget.state.matchedLocation;
     final user = ref.watch(currentUserProvider);
-    final bottomItems =
-        _navItems.where((i) => _bottomNavPaths.contains(i.path)).toList();
+    final bottomItems = _navItems
+        .where((i) =>
+            _bottomNavPaths.contains(i.path) && i.visibleFor(user?.role))
+        .toList();
     final selectedIdx = bottomItems.indexWhere((i) => i.path == loc);
 
     return Scaffold(
@@ -290,7 +304,9 @@ class _Sidebar extends ConsumerWidget {
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
-              children: _navItems.map((item) {
+              children: _navItems
+                  .where((item) => item.visibleFor(user?.role))
+                  .map((item) {
                 final active = loc == item.path;
                 return _SidebarItem(
                   item: item,
@@ -495,6 +511,7 @@ class _MobileAppBar extends ConsumerWidget implements PreferredSizeWidget {
     final stationName = ref.watch(stationNameProvider);
 
     return AppBar(
+      automaticallyImplyLeading: false,
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -585,7 +602,9 @@ class _MobileDrawer extends ConsumerWidget {
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                children: _navItems.map((item) {
+                children: _navItems
+                    .where((item) => item.visibleFor(user?.role))
+                    .map((item) {
                   final active = currentPath == item.path;
                   return ListTile(
                     onTap: () {

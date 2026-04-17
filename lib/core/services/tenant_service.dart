@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/app_constants.dart';
@@ -88,39 +86,34 @@ class TenantService {
     return stationCode;
   }
 
-  /// Set the Supabase session (access + refresh token) after login.
+  /// Set the Supabase session after login/signup.
+  /// Uses client.auth.setSession(refreshToken) which calls GoTrue's token
+  /// endpoint and returns a full session — avoids the partial-JSON crash
+  /// that recoverSession causes when the user object shape is wrong.
   Future<void> setSession(String accessToken, String refreshToken) async {
     await _storage.write(
       key: StorageKeys.userSession,
-      value: '$accessToken|$refreshToken',
+      value: refreshToken,
     );
-    // recoverSession sets both tokens so the client can auto-refresh on expiry
-    await client.auth.recoverSession(_sessionJson(accessToken, refreshToken));
+    try {
+      await client.auth.setSession(refreshToken);
+    } catch (_) {
+      // Non-fatal: app AuthUser is already persisted; GoTrue session is
+      // best-effort for auto-refresh. Silently ignore if it fails.
+    }
   }
 
   /// Restore the saved session on app resume.
   Future<bool> restoreSession() async {
     final saved = await _storage.read(key: StorageKeys.userSession);
     if (saved == null) return false;
-    final parts = saved.split('|');
-    if (parts.length < 2) return false;
     try {
-      await client.auth
-          .recoverSession(_sessionJson(parts[0], parts[1]))
-          .timeout(const Duration(seconds: 8));
+      await client.auth.setSession(saved).timeout(const Duration(seconds: 8));
       return true;
     } catch (_) {
       return false;
     }
   }
-
-  static String _sessionJson(String accessToken, String refreshToken) =>
-      jsonEncode({
-        'access_token': accessToken,
-        'refresh_token': refreshToken,
-        'token_type': 'bearer',
-        'expires_in': 3600,
-      });
 
   /// Clear all tenant data on logout.
   Future<void> clearTenant() async {
@@ -137,5 +130,13 @@ class TenantService {
   Future<void> fullReset() async {
     await clearTenant();
     await _storage.deleteAll();
+  }
+
+  /// Returns a temporary SupabaseClient for [entry] without writing to secure
+  /// storage or replacing the app-wide tenant client.
+  /// Use this for read-only flows (e.g. creditor portal) that must not
+  /// interfere with an active dealer/manager session.
+  SupabaseClient createTemporaryClient(StationRegistryEntry entry) {
+    return SupabaseClient(entry.supabaseUrl, entry.anonKey);
   }
 }

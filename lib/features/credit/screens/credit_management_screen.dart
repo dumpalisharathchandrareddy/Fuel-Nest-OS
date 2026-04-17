@@ -47,9 +47,9 @@ class _CreditManagementScreenState
       final customers = await db
           .from('CreditCustomer')
           .select(
-              'id, name, customer_code, phone_number, credit_limit, active, created_at')
+              'id, full_name, customer_code, phone_number, active, created_at')
           .eq('station_id', user.stationId)
-          .order('name');
+          .order('full_name');
 
       // Compute outstanding per customer from CreditTransaction.remaining_balance
       // remaining_balance is maintained by the backend on each transaction.
@@ -157,612 +157,78 @@ class _CreditManagementScreenState
   // ── Add credit entry ────────────────────────────────────────────────────────
   Future<void> _showAddCreditEntry(
       [Map<String, dynamic>? presetCustomer]) async {
-    Map<String, dynamic>? selCustomer = presetCustomer;
-    final amtCtrl = TextEditingController();
-    final litresCtrl = TextEditingController();
-    final noteCtrl = TextEditingController();
-    String fuelType = FuelTypes.all.first;
-    bool submitting = false;
-    String? err;
-
-    await showModalBottomSheet(
+    final success = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.bgSurface,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) => StatefulBuilder(
-          builder: (ctx, ss) => Padding(
-                padding: EdgeInsets.fromLTRB(
-                    20, 20, 20, MediaQuery.viewInsetsOf(ctx).bottom + 24),
-                child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(children: [
-                        const Icon(Icons.add_card,
-                            color: AppColors.red, size: 22),
-                        const SizedBox(width: 10),
-                        const Expanded(
-                            child: Text('Add Credit Entry',
-                                style: TextStyle(
-                                    color: AppColors.textPrimary,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700))),
-                        IconButton(
-                            icon: const Icon(Icons.close,
-                                size: 20, color: AppColors.textMuted),
-                            onPressed: () => Navigator.pop(ctx)),
-                      ]),
-                      const SizedBox(height: 16),
-
-                      // Customer selector or display
-                      if (selCustomer != null)
-                        Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                                color: AppColors.bgCard,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: AppColors.border)),
-                            child: Row(children: [
-                              Expanded(
-                                  child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                    Text(selCustomer!['full_name'] as String,
-                                        style: const TextStyle(
-                                            color: AppColors.textPrimary,
-                                            fontWeight: FontWeight.w600)),
-                                    Text(
-                                        selCustomer!['phone_number']
-                                                as String? ??
-                                            '',
-                                        style: const TextStyle(
-                                            color: AppColors.textMuted,
-                                            fontSize: 12)),
-                                  ])),
-                              if (presetCustomer == null)
-                                IconButton(
-                                    icon: const Icon(Icons.close,
-                                        size: 16, color: AppColors.textMuted),
-                                    onPressed: () =>
-                                        ss(() => selCustomer = null)),
-                            ]))
-                      else
-                        DropdownButtonFormField<String>(
-                          dropdownColor: AppColors.bgSurface,
-                          style: const TextStyle(
-                              color: AppColors.textPrimary, fontSize: 13),
-                          decoration: InputDecoration(
-                              labelText: 'Customer',
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                              filled: true,
-                              fillColor: AppColors.bgCard),
-                          hint: const Text('Select customer',
-                              style: TextStyle(color: AppColors.textMuted)),
-                          items: _customers
-                              .map((c) => DropdownMenuItem<String>(
-                                  value: c['id'] as String,
-                                  child: Text(
-                                      '${c['name']} (${c['phone_number']})')))
-                              .toList(),
-                          onChanged: (v) {
-                            if (v != null) {
-                              ss(() {
-                                final found = _customers
-                                    .where((c) => c['id'] == v)
-                                    .toList();
-                                selCustomer = found.isNotEmpty
-                                    ? Map<String, dynamic>.from(
-                                        found.first as Map)
-                                    : null;
-                              });
-                            }
-                          },
-                        ),
-
-                      const SizedBox(height: 12),
-                      Row(children: [
-                        Expanded(
-                            child: TextField(
-                          controller: amtCtrl,
-                          keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true),
-                          style: const TextStyle(color: AppColors.textPrimary),
-                          decoration: InputDecoration(
-                              labelText: 'Amount (₹)',
-                              prefixText: '₹ ',
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                              filled: true,
-                              fillColor: AppColors.bgCard),
-                          onChanged: (_) => ss(() {}),
-                        )),
-                        const SizedBox(width: 8),
-                        Expanded(
-                            child: TextField(
-                          controller: litresCtrl,
-                          keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true),
-                          style: const TextStyle(color: AppColors.textPrimary),
-                          decoration: InputDecoration(
-                              labelText: 'Litres (optional)',
-                              suffixText: 'L',
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                              filled: true,
-                              fillColor: AppColors.bgCard),
-                        )),
-                      ]),
-                      const SizedBox(height: 12),
-                      const Text('Fuel Type',
-                          style: TextStyle(
-                              color: AppColors.textMuted, fontSize: 12)),
-                      const SizedBox(height: 6),
-                      Wrap(
-                          spacing: 6,
-                          children: FuelTypes.all.map((f) {
-                            final sel = fuelType == f;
-                            return GestureDetector(
-                              onTap: () => ss(() => fuelType = f),
-                              child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                      color: sel
-                                          ? AppColors.blue
-                                          : AppColors.bgCard,
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
-                                          color: sel
-                                              ? AppColors.blue
-                                              : AppColors.border)),
-                                  child: Text(f,
-                                      style: TextStyle(
-                                          color: sel
-                                              ? Colors.white
-                                              : AppColors.textSecondary,
-                                          fontSize: 12,
-                                          fontWeight: sel
-                                              ? FontWeight.w600
-                                              : FontWeight.w400))),
-                            );
-                          }).toList()),
-                      const SizedBox(height: 12),
-                      TextField(
-                          controller: noteCtrl,
-                          style: const TextStyle(color: AppColors.textPrimary),
-                          decoration: InputDecoration(
-                              labelText: 'Note (optional)',
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                              filled: true,
-                              fillColor: AppColors.bgCard)),
-                      if (err != null) ...[
-                        const SizedBox(height: 8),
-                        Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                                color: AppColors.redBg,
-                                borderRadius: BorderRadius.circular(6)),
-                            child: Text(err!,
-                                style: const TextStyle(
-                                    color: AppColors.red, fontSize: 12)))
-                      ],
-                      const SizedBox(height: 16),
-                      AppButton(
-                        label: 'Record Credit Entry',
-                        loading: submitting,
-                        width: double.infinity,
-                        onTap: selCustomer == null || amtCtrl.text.isEmpty
-                            ? null
-                            : () async {
-                                final amt = double.tryParse(amtCtrl.text);
-                                if (amt == null || amt <= 0) {
-                                  ss(() => err = 'Enter valid amount');
-                                  return;
-                                }
-                                ss(() {
-                                  submitting = true;
-                                  err = null;
-                                });
-                                try {
-                                  final db = TenantService.instance.client;
-                                  final user = ref.read(currentUserProvider)!;
-                                  final now =
-                                      DateTime.now().toUtc().toIso8601String();
-                                  await db.from('CreditTransaction').insert({
-                                    'station_id': user.stationId,
-                                    'customer_id': selCustomer!['id'],
-                                    'amount': amt,
-                                    'litres':
-                                        double.tryParse(litresCtrl.text) ?? 0,
-                                    'fuel_type': fuelType,
-                                    // CreditTransaction has no notes column
-                                    'date':
-                                        now, // DipReading: date column (DateTime)
-                                    'created_by_id': user.id,
-                                    'created_at': now,
-                                  });
-                                  if (ctx.mounted) Navigator.pop(ctx);
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                            content:
-                                                Text('✅ Credit entry recorded'),
-                                            backgroundColor: AppColors.green));
-                                    _fetch();
-                                    if (_selectedCustomer?['id'] ==
-                                        selCustomer!['id'])
-                                      _loadLedger(selCustomer!);
-                                  }
-                                } catch (e) {
-                                  ss(() {
-                                    submitting = false;
-                                    err = e.toString();
-                                  });
-                                }
-                              },
-                      ),
-                    ]),
-              )),
+      builder: (ctx) => CreditEntrySheet(
+        presetCustomer: presetCustomer,
+        customers: _customers,
+      ),
     );
-    amtCtrl.dispose();
-    litresCtrl.dispose();
-    noteCtrl.dispose();
+
+    if (success == true) {
+      _fetch().then((_) {
+        final cid = presetCustomer?['id'];
+        if (cid != null) {
+          final found = _customers.where((c) => c['id'] == cid).toList();
+          if (found.isNotEmpty) _loadLedger(found.first);
+        }
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('✅ Credit entry recorded'),
+            backgroundColor: AppColors.green));
+      }
+    }
   }
 
   // ── Record payment ──────────────────────────────────────────────────────────
   Future<void> _showRecordPayment(Map<String, dynamic> customer) async {
-    final amtCtrl = TextEditingController();
-    final noteCtrl = TextEditingController();
-    String method = 'Cash';
-    bool submitting = false;
-    String? err;
-    final outstanding = customer['outstanding'] as double? ?? 0;
-
-    await showModalBottomSheet(
+    final success = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.bgSurface,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) => StatefulBuilder(
-          builder: (ctx, ss) => Padding(
-                padding: EdgeInsets.fromLTRB(
-                    20, 20, 20, MediaQuery.viewInsetsOf(ctx).bottom + 24),
-                child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(children: [
-                        const Icon(Icons.payments_outlined,
-                            color: AppColors.green, size: 22),
-                        const SizedBox(width: 10),
-                        Expanded(
-                            child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                              const Text('Record Payment',
-                                  style: TextStyle(
-                                      color: AppColors.textPrimary,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700)),
-                              Text(customer['full_name'] as String,
-                                  style: const TextStyle(
-                                      color: AppColors.textMuted,
-                                      fontSize: 12)),
-                            ])),
-                        IconButton(
-                            icon: const Icon(Icons.close,
-                                size: 20, color: AppColors.textMuted),
-                            onPressed: () => Navigator.pop(ctx)),
-                      ]),
-                      const SizedBox(height: 4),
-                      Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                              color: AppColors.amberBg,
-                              borderRadius: BorderRadius.circular(8)),
-                          child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text('Outstanding',
-                                    style: TextStyle(
-                                        color: AppColors.amber, fontSize: 12)),
-                                Text(IndianCurrency.format(outstanding),
-                                    style: const TextStyle(
-                                        color: AppColors.amber,
-                                        fontWeight: FontWeight.w700)),
-                              ])),
-                      const SizedBox(height: 16),
-                      TextField(
-                          controller: amtCtrl,
-                          keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true),
-                          style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700),
-                          decoration: InputDecoration(
-                              labelText: 'Payment Amount (₹)',
-                              prefixText: '₹ ',
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                              filled: true,
-                              fillColor: AppColors.bgCard),
-                          onChanged: (_) => ss(() {})),
-                      const SizedBox(height: 4),
-                      GestureDetector(
-                          onTap: () => ss(() =>
-                              amtCtrl.text = outstanding.toStringAsFixed(2)),
-                          child: const Text('Full amount',
-                              style: TextStyle(
-                                  color: AppColors.blue, fontSize: 12))),
-                      const SizedBox(height: 12),
-                      const Text('Payment Method',
-                          style: TextStyle(
-                              color: AppColors.textMuted, fontSize: 12)),
-                      const SizedBox(height: 6),
-                      Wrap(
-                          spacing: 6,
-                          children: [
-                            'Cash',
-                            'GPay',
-                            'PhonePe',
-                            'Paytm',
-                            'Card',
-                            'NEFT'
-                          ].map((m) {
-                            final sel = method == m;
-                            return GestureDetector(
-                                onTap: () => ss(() => method = m),
-                                child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(
-                                        color: sel
-                                            ? AppColors.green
-                                            : AppColors.bgCard,
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(
-                                            color: sel
-                                                ? AppColors.green
-                                                : AppColors.border)),
-                                    child: Text(m,
-                                        style: TextStyle(
-                                            color: sel
-                                                ? Colors.white
-                                                : AppColors.textSecondary,
-                                            fontSize: 12,
-                                            fontWeight: sel
-                                                ? FontWeight.w600
-                                                : FontWeight.w400))));
-                          }).toList()),
-                      const SizedBox(height: 12),
-                      TextField(
-                          controller: noteCtrl,
-                          style: const TextStyle(color: AppColors.textPrimary),
-                          decoration: InputDecoration(
-                              labelText: 'Note (optional)',
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                              filled: true,
-                              fillColor: AppColors.bgCard)),
-                      if (err != null) ...[
-                        const SizedBox(height: 8),
-                        Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                                color: AppColors.redBg,
-                                borderRadius: BorderRadius.circular(6)),
-                            child: Text(err!,
-                                style: const TextStyle(
-                                    color: AppColors.red, fontSize: 12)))
-                      ],
-                      const SizedBox(height: 16),
-                      AppButton(
-                        label: 'Record Payment',
-                        loading: submitting,
-                        width: double.infinity,
-                        onTap: () async {
-                          final amt = double.tryParse(amtCtrl.text);
-                          if (amt == null || amt <= 0) {
-                            ss(() => err = 'Enter valid amount');
-                            return;
-                          }
-                          ss(() {
-                            submitting = true;
-                            err = null;
-                          });
-                          try {
-                            final db = TenantService.instance.client;
-                            final user = ref.read(currentUserProvider)!;
-                            final now =
-                                DateTime.now().toUtc().toIso8601String();
-                            await db.from('CreditPayment').insert({
-                              'station_id': user.stationId,
-                              'customer_id': customer['id'],
-                              'amount': amt,
-                              'payment_mode': method,
-                              // CreditTransaction has no notes column
-                              'date': now.split('T')[0],
-                              'created_by_id': user.id,
-                              'created_at': now,
-                            });
-                            if (ctx.mounted) Navigator.pop(ctx);
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                  content: Text(
-                                      '✅ Payment of ${IndianCurrency.format(amt)} recorded'),
-                                  backgroundColor: AppColors.green));
-                              _fetch();
-                              if (_selectedCustomer?['id'] == customer['id'])
-                                _loadLedger(customer);
-                            }
-                          } catch (e) {
-                            ss(() {
-                              submitting = false;
-                              err = e.toString();
-                            });
-                          }
-                        },
-                      ),
-                    ]),
-              )),
+      builder: (ctx) => CreditPaymentSheet(customer: customer),
     );
-    amtCtrl.dispose();
-    noteCtrl.dispose();
+
+    if (success == true) {
+      _fetch().then((_) {
+        final cid = customer['id'];
+        final found = _customers.where((c) => c['id'] == cid).toList();
+        if (found.isNotEmpty) _loadLedger(found.first);
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('✅ Payment recorded'),
+            backgroundColor: AppColors.green));
+      }
+    }
   }
 
   // ── Add customer ────────────────────────────────────────────────────────────
   Future<void> _showAddCustomer() async {
-    final nameCtrl = TextEditingController();
-    final phoneCtrl = TextEditingController();
-    final vehicleCtrl = TextEditingController();
-    final limitCtrl =
-        TextEditingController(text: '0'); // CreditCustomer has no credit_limit
-    bool submitting = false;
-    String? err;
-
-    await showModalBottomSheet(
+    final success = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.bgSurface,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) => StatefulBuilder(
-          builder: (ctx, ss) => Padding(
-                padding: EdgeInsets.fromLTRB(
-                    20, 20, 20, MediaQuery.viewInsetsOf(ctx).bottom + 24),
-                child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('New Credit Customer',
-                          style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 16),
-                      TextField(
-                          controller: nameCtrl,
-                          textCapitalization: TextCapitalization.words,
-                          style: const TextStyle(color: AppColors.textPrimary),
-                          decoration: InputDecoration(
-                              labelText: 'Full Name *',
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                              filled: true,
-                              fillColor: AppColors.bgCard)),
-                      const SizedBox(height: 12),
-                      TextField(
-                          controller: phoneCtrl,
-                          keyboardType: TextInputType.phone,
-                          style: const TextStyle(color: AppColors.textPrimary),
-                          decoration: InputDecoration(
-                              labelText: 'Mobile Number *',
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                              filled: true,
-                              fillColor: AppColors.bgCard)),
-                      const SizedBox(height: 12),
-                      TextField(
-                          controller: vehicleCtrl,
-                          textCapitalization: TextCapitalization.characters,
-                          style: const TextStyle(color: AppColors.textPrimary),
-                          decoration: InputDecoration(
-                              labelText: 'Vehicle Number (optional)',
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                              filled: true,
-                              fillColor: AppColors.bgCard)),
-                      const SizedBox(height: 12),
-                      TextField(
-                          controller: limitCtrl,
-                          keyboardType: TextInputType.number,
-                          style: const TextStyle(color: AppColors.textPrimary),
-                          decoration: InputDecoration(
-                              labelText: 'Credit Limit (₹)',
-                              prefixText: '₹ ',
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                              filled: true,
-                              fillColor: AppColors.bgCard)),
-                      if (err != null) ...[
-                        const SizedBox(height: 8),
-                        Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                                color: AppColors.redBg,
-                                borderRadius: BorderRadius.circular(6)),
-                            child: Text(err!,
-                                style: const TextStyle(
-                                    color: AppColors.red, fontSize: 12)))
-                      ],
-                      const SizedBox(height: 16),
-                      AppButton(
-                          label: 'Add Customer',
-                          loading: submitting,
-                          width: double.infinity,
-                          onTap: () async {
-                            if (nameCtrl.text.trim().isEmpty ||
-                                phoneCtrl.text.trim().isEmpty) {
-                              ss(() => err = 'Name and phone required');
-                              return;
-                            }
-                            ss(() {
-                              submitting = true;
-                              err = null;
-                            });
-                            try {
-                              final db = TenantService.instance.client;
-                              final user = ref.read(currentUserProvider)!;
-                              // CreditCustomer: full_name, phone_number, customer_code (unique per station)
-                              // NO customer_code, NO credit_limit columns.
-                              final code =
-                                  'CC-${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}';
-                              await db.from('CreditCustomer').insert({
-                                'station_id': user.stationId,
-                                'full_name': nameCtrl.text.trim(),
-                                'phone_number': phoneCtrl.text.trim(),
-                                'customer_code': code,
-                                'active': true,
-                                'is_walk_in': false,
-                                'advance_balance': 0,
-                                'created_by_id': user.id,
-                                'created_at':
-                                    DateTime.now().toUtc().toIso8601String(),
-                                'updated_at':
-                                    DateTime.now().toUtc().toIso8601String(),
-                              });
-                              if (ctx.mounted) Navigator.pop(ctx);
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content: Text('✅ Customer added'),
-                                        backgroundColor: AppColors.green));
-                                _fetch();
-                              }
-                            } catch (e) {
-                              ss(() {
-                                submitting = false;
-                                err = e.toString().contains('duplicate')
-                                    ? 'This phone number already has a credit account'
-                                    : e.toString();
-                              });
-                            }
-                          }),
-                    ]),
-              )),
+      builder: (ctx) => const CustomerFormSheet(),
     );
-    nameCtrl.dispose();
-    phoneCtrl.dispose();
-    vehicleCtrl.dispose();
-    limitCtrl.dispose();
+
+    if (success == true) {
+      _fetch();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('✅ Customer added'),
+            backgroundColor: AppColors.green));
+      }
+    }
   }
 
   void _sendWhatsApp(Map<String, dynamic> customer) {
@@ -782,13 +248,15 @@ class _CreditManagementScreenState
     final isManager = user?.isManagerOrDealer ?? false;
     final filtered = _filtered;
 
-    if (_loading)
+    if (_loading) {
       return const Scaffold(
           backgroundColor: AppColors.bgApp, body: LoadingView());
-    if (_error != null)
+    }
+    if (_error != null) {
       return Scaffold(
           backgroundColor: AppColors.bgApp,
           body: ErrorView(message: _error!, onRetry: _fetch));
+    }
 
     // On wide screens: two panels; on narrow: ledger is a sheet
     final size = MediaQuery.sizeOf(context);
@@ -1221,4 +689,580 @@ class _StatPill extends StatelessWidget {
         Text(label,
             style: const TextStyle(color: AppColors.textMuted, fontSize: 10))
       ]));
+}
+
+// ── Modals ───────────────────────────────────────────────────────────────────
+
+class CreditEntrySheet extends ConsumerStatefulWidget {
+  final Map<String, dynamic>? presetCustomer;
+  final List<dynamic> customers;
+  const CreditEntrySheet(
+      {super.key, this.presetCustomer, required this.customers});
+  @override
+  ConsumerState<CreditEntrySheet> createState() => _CreditEntrySheetState();
+}
+
+class _CreditEntrySheetState extends ConsumerState<CreditEntrySheet> {
+  Map<String, dynamic>? selCustomer;
+  final amtCtrl = TextEditingController();
+  final litresCtrl = TextEditingController();
+  final noteCtrl = TextEditingController();
+  String fuelType = FuelTypes.all.first;
+  bool submitting = false;
+  String? err;
+
+  @override
+  void initState() {
+    super.initState();
+    selCustomer = widget.presetCustomer;
+  }
+
+  @override
+  void dispose() {
+    amtCtrl.dispose();
+    litresCtrl.dispose();
+    noteCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          20, 20, 20, MediaQuery.viewInsetsOf(context).bottom + 24),
+      child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              const Icon(Icons.add_card, color: AppColors.red, size: 22),
+              const SizedBox(width: 10),
+              const Expanded(
+                  child: Text('Add Credit Entry',
+                      style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700))),
+              IconButton(
+                  icon: const Icon(Icons.close,
+                      size: 20, color: AppColors.textMuted),
+                  onPressed: () => Navigator.pop(context)),
+            ]),
+            const SizedBox(height: 16),
+            if (selCustomer != null)
+              Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                      color: AppColors.bgCard,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.border)),
+                  child: Row(children: [
+                    Expanded(
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                          Text(selCustomer!['full_name'] as String,
+                              style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w600)),
+                          Text(selCustomer!['phone_number'] as String? ?? '',
+                              style: const TextStyle(
+                                  color: AppColors.textMuted, fontSize: 12)),
+                        ])),
+                    if (widget.presetCustomer == null)
+                      IconButton(
+                          icon: const Icon(Icons.close,
+                              size: 16, color: AppColors.textMuted),
+                          onPressed: () => setState(() => selCustomer = null)),
+                  ]))
+            else
+              DropdownButtonFormField<String>(
+                dropdownColor: AppColors.bgSurface,
+                style:
+                    const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                decoration: InputDecoration(
+                    labelText: 'Customer',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    filled: true,
+                    fillColor: AppColors.bgCard),
+                hint: const Text('Select customer',
+                    style: TextStyle(color: AppColors.textMuted)),
+                items: widget.customers
+                    .map((c) => DropdownMenuItem<String>(
+                        value: c['id'] as String,
+                        child:
+                            Text('${c['full_name']} (${c['phone_number']})')))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) {
+                    setState(() {
+                      final found =
+                          widget.customers.where((c) => c['id'] == v).toList();
+                      selCustomer = found.isNotEmpty
+                          ? Map<String, dynamic>.from(found.first as Map)
+                          : null;
+                    });
+                  }
+                },
+              ),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(
+                  child: TextField(
+                controller: amtCtrl,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: InputDecoration(
+                    labelText: 'Amount (₹)',
+                    prefixText: '₹ ',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    filled: true,
+                    fillColor: AppColors.bgCard),
+              )),
+              const SizedBox(width: 8),
+              Expanded(
+                  child: TextField(
+                controller: litresCtrl,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: InputDecoration(
+                    labelText: 'Litres (optional)',
+                    suffixText: 'L',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    filled: true,
+                    fillColor: AppColors.bgCard),
+              )),
+            ]),
+            const SizedBox(height: 12),
+            const Text('Fuel Type',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+            const SizedBox(height: 6),
+            Wrap(
+                spacing: 6,
+                children: FuelTypes.all.map((f) {
+                  final sel = fuelType == f;
+                  return GestureDetector(
+                    onTap: () => setState(() => fuelType = f),
+                    child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                            color: sel ? AppColors.blue : AppColors.bgCard,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                                color:
+                                    sel ? AppColors.blue : AppColors.border)),
+                        child: Text(f,
+                            style: TextStyle(
+                                color: sel
+                                    ? Colors.white
+                                    : AppColors.textSecondary,
+                                fontSize: 12,
+                                fontWeight:
+                                    sel ? FontWeight.w600 : FontWeight.w400))),
+                  );
+                }).toList()),
+            const SizedBox(height: 12),
+            TextField(
+                controller: noteCtrl,
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: InputDecoration(
+                    labelText: 'Note (optional)',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    filled: true,
+                    fillColor: AppColors.bgCard)),
+            if (err != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                      color: AppColors.redBg,
+                      borderRadius: BorderRadius.circular(6)),
+                  child: Text(err!,
+                      style:
+                          const TextStyle(color: AppColors.red, fontSize: 12)))
+            ],
+            const SizedBox(height: 16),
+            AppButton(
+              label: 'Record Credit Entry',
+              loading: submitting,
+              width: double.infinity,
+              onTap: selCustomer == null
+                  ? null
+                  : () async {
+                      final amt = double.tryParse(amtCtrl.text);
+                      if (amt == null || amt <= 0) {
+                        setState(() => err = 'Enter valid amount');
+                        return;
+                      }
+                      setState(() {
+                        submitting = true;
+                        err = null;
+                      });
+                      try {
+                        final db = TenantService.instance.client;
+                        final user = ref.read(currentUserProvider)!;
+                        final now = DateTime.now().toUtc().toIso8601String();
+                        await db.from('CreditTransaction').insert({
+                          'station_id': user.stationId,
+                          'customer_id': selCustomer!['id'],
+                          'amount': amt,
+                          'litres': double.tryParse(litresCtrl.text) ?? 0,
+                          'fuel_type': fuelType,
+                          'date': now,
+                          'created_by_id': user.id,
+                          'created_at': now,
+                        });
+                        if (mounted) Navigator.pop(context, true);
+                      } catch (e) {
+                        if (mounted) {
+                          setState(() {
+                            submitting = false;
+                            err = e.toString();
+                          });
+                        }
+                      }
+                    },
+            ),
+          ]),
+    );
+  }
+}
+
+class CreditPaymentSheet extends ConsumerStatefulWidget {
+  final Map<String, dynamic> customer;
+  const CreditPaymentSheet({super.key, required this.customer});
+  @override
+  ConsumerState<CreditPaymentSheet> createState() => _CreditPaymentSheetState();
+}
+
+class _CreditPaymentSheetState extends ConsumerState<CreditPaymentSheet> {
+  final amtCtrl = TextEditingController();
+  final noteCtrl = TextEditingController();
+  String method = 'Cash';
+  bool submitting = false;
+  String? err;
+
+  @override
+  void dispose() {
+    amtCtrl.dispose();
+    noteCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final outstanding = widget.customer['outstanding'] as double? ?? 0;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          20, 20, 20, MediaQuery.viewInsetsOf(context).bottom + 24),
+      child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              const Icon(Icons.payments_outlined,
+                  color: AppColors.green, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    const Text('Record Payment',
+                        style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700)),
+                    Text(widget.customer['full_name'] as String,
+                        style: const TextStyle(
+                            color: AppColors.textMuted, fontSize: 12)),
+                  ])),
+              IconButton(
+                  icon: const Icon(Icons.close,
+                      size: 20, color: AppColors.textMuted),
+                  onPressed: () => Navigator.pop(context)),
+            ]),
+            const SizedBox(height: 4),
+            Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                    color: AppColors.amberBg,
+                    borderRadius: BorderRadius.circular(8)),
+                child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Outstanding',
+                          style:
+                              TextStyle(color: AppColors.amber, fontSize: 12)),
+                      Text(IndianCurrency.format(outstanding),
+                          style: const TextStyle(
+                              color: AppColors.amber,
+                              fontWeight: FontWeight.w700)),
+                    ])),
+            const SizedBox(height: 16),
+            TextField(
+              controller: amtCtrl,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700),
+              decoration: InputDecoration(
+                  labelText: 'Payment Amount (₹)',
+                  prefixText: '₹ ',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  filled: true,
+                  fillColor: AppColors.bgCard),
+            ),
+            const SizedBox(height: 4),
+            GestureDetector(
+                onTap: () => setState(
+                    () => amtCtrl.text = outstanding.toStringAsFixed(2)),
+                child: const Text('Full amount',
+                    style: TextStyle(color: AppColors.blue, fontSize: 12))),
+            const SizedBox(height: 12),
+            const Text('Payment Method',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+            const SizedBox(height: 6),
+            Wrap(
+                spacing: 6,
+                children: ['Cash', 'GPay', 'PhonePe', 'Paytm', 'Card', 'NEFT']
+                    .map((m) {
+                  final sel = method == m;
+                  return GestureDetector(
+                      onTap: () => setState(() => method = m),
+                      child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                              color: sel ? AppColors.green : AppColors.bgCard,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                  color: sel
+                                      ? AppColors.green
+                                      : AppColors.border)),
+                          child: Text(m,
+                              style: TextStyle(
+                                  color: sel
+                                      ? Colors.white
+                                      : AppColors.textSecondary,
+                                  fontSize: 12,
+                                  fontWeight: sel
+                                      ? FontWeight.w600
+                                      : FontWeight.w400))));
+                }).toList()),
+            const SizedBox(height: 12),
+            TextField(
+                controller: noteCtrl,
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: InputDecoration(
+                    labelText: 'Note (optional)',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    filled: true,
+                    fillColor: AppColors.bgCard)),
+            if (err != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                      color: AppColors.redBg,
+                      borderRadius: BorderRadius.circular(6)),
+                  child: Text(err!,
+                      style:
+                          const TextStyle(color: AppColors.red, fontSize: 12)))
+            ],
+            const SizedBox(height: 16),
+            AppButton(
+              label: 'Record Payment',
+              loading: submitting,
+              width: double.infinity,
+              onTap: () async {
+                final amt = double.tryParse(amtCtrl.text);
+                if (amt == null || amt <= 0) {
+                  setState(() => err = 'Enter valid amount');
+                  return;
+                }
+                setState(() {
+                  submitting = true;
+                  err = null;
+                });
+                try {
+                  final db = TenantService.instance.client;
+                  final user = ref.read(currentUserProvider)!;
+                  final now = DateTime.now().toUtc().toIso8601String();
+                  await db.from('CreditPayment').insert({
+                    'station_id': user.stationId,
+                    'customer_id': widget.customer['id'],
+                    'amount': amt,
+                    'payment_mode': method,
+                    'date': now.split('T')[0],
+                    'created_by_id': user.id,
+                    'created_at': now,
+                  });
+                  if (mounted) Navigator.pop(context, true);
+                } catch (e) {
+                  if (mounted) {
+                    setState(() {
+                      submitting = false;
+                      err = e.toString();
+                    });
+                  }
+                }
+              },
+            ),
+          ]),
+    );
+  }
+}
+
+class CustomerFormSheet extends ConsumerStatefulWidget {
+  const CustomerFormSheet({super.key});
+  @override
+  ConsumerState<CustomerFormSheet> createState() => _CustomerFormSheetState();
+}
+
+class _CustomerFormSheetState extends ConsumerState<CustomerFormSheet> {
+  final nameCtrl = TextEditingController();
+  final phoneCtrl = TextEditingController();
+  final vehicleCtrl = TextEditingController();
+  final limitCtrl = TextEditingController(text: '0');
+  bool submitting = false;
+  String? err;
+
+  @override
+  void dispose() {
+    nameCtrl.dispose();
+    phoneCtrl.dispose();
+    vehicleCtrl.dispose();
+    limitCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          20, 20, 20, MediaQuery.viewInsetsOf(context).bottom + 24),
+      child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('New Credit Customer',
+                style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700)),
+            const SizedBox(height: 16),
+            TextField(
+                controller: nameCtrl,
+                textCapitalization: TextCapitalization.words,
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: InputDecoration(
+                    labelText: 'Full Name *',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    filled: true,
+                    fillColor: AppColors.bgCard)),
+            const SizedBox(height: 12),
+            TextField(
+                controller: phoneCtrl,
+                keyboardType: TextInputType.phone,
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: InputDecoration(
+                    labelText: 'Mobile Number *',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    filled: true,
+                    fillColor: AppColors.bgCard)),
+            const SizedBox(height: 12),
+            TextField(
+                controller: vehicleCtrl,
+                textCapitalization: TextCapitalization.characters,
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: InputDecoration(
+                    labelText: 'Vehicle Number (optional)',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    filled: true,
+                    fillColor: AppColors.bgCard)),
+            const SizedBox(height: 12),
+            TextField(
+                controller: limitCtrl,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: InputDecoration(
+                    labelText: 'Credit Limit (₹)',
+                    prefixText: '₹ ',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    filled: true,
+                    fillColor: AppColors.bgCard)),
+            if (err != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                      color: AppColors.redBg,
+                      borderRadius: BorderRadius.circular(6)),
+                  child: Text(err!,
+                      style:
+                          const TextStyle(color: AppColors.red, fontSize: 12)))
+            ],
+            const SizedBox(height: 16),
+            AppButton(
+                label: 'Add Customer',
+                loading: submitting,
+                width: double.infinity,
+                onTap: () async {
+                  if (nameCtrl.text.trim().isEmpty ||
+                      phoneCtrl.text.trim().isEmpty) {
+                    setState(() => err = 'Name and phone required');
+                    return;
+                  }
+                  setState(() {
+                    submitting = true;
+                    err = null;
+                  });
+                  try {
+                    final db = TenantService.instance.client;
+                    final user = ref.read(currentUserProvider)!;
+                    final code =
+                        'CC-${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}';
+                    await db.from('CreditCustomer').insert({
+                      'station_id': user.stationId,
+                      'full_name': nameCtrl.text.trim(),
+                      'phone_number': phoneCtrl.text.trim(),
+                      'customer_code': code,
+                      'active': true,
+                      'is_walk_in': false,
+                      'advance_balance': 0,
+                      'created_by_id': user.id,
+                      'created_at': DateTime.now().toUtc().toIso8601String(),
+                      'updated_at': DateTime.now().toUtc().toIso8601String(),
+                    });
+                    if (mounted) Navigator.pop(context, true);
+                  } catch (e) {
+                    if (mounted) {
+                      setState(() {
+                        submitting = false;
+                        err = e.toString().contains('duplicate')
+                            ? 'This phone number already has a credit account'
+                            : e.toString();
+                      });
+                    }
+                  }
+                }),
+          ]),
+    );
+  }
 }

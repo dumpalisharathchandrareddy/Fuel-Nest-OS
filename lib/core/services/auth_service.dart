@@ -5,6 +5,28 @@ import '../constants/app_constants.dart';
 import 'tenant_service.dart';
 import 'registry_service.dart';
 
+/// Safely parses a Supabase [FunctionResponse.data] value.
+/// Throws a clear [Exception] if the data is null or not a Map.
+/// The Supabase Flutter SDK can return null even on 2xx when the response
+/// body is empty or the content-type is unexpected.
+Map<String, dynamic> _parseData(dynamic raw, {required String context}) {
+  if (raw == null) {
+    throw Exception('$context: empty response body');
+  }
+  if (raw is! Map) {
+    throw Exception('$context: unexpected response type ${raw.runtimeType}');
+  }
+  return Map<String, dynamic>.from(raw);
+}
+
+/// Extracts a readable error string from a raw response body.
+/// Falls back to [fallback] when nothing useful can be extracted.
+String _errorFrom(dynamic raw, {required String fallback}) {
+  if (raw == null) return fallback;
+  if (raw is Map) return (raw['error'] ?? raw['message'] ?? fallback).toString();
+  return fallback;
+}
+
 /// Handles all authentication flows for all 4 hubs.
 /// Dealer / Manager / Staff → station's own Supabase (via Edge Function login)
 /// Creditor → station's own Supabase (read-only credit data)
@@ -75,13 +97,16 @@ class AuthService {
       ).timeout(const Duration(seconds: 10));
 
       if (response.status != 200) {
-        final error = response.data?['error'] ?? 'Login failed';
-        throw Exception(error.toString());
+        throw Exception(_errorFrom(response.data, fallback: 'Login failed'));
       }
 
-      final data = response.data as Map<String, dynamic>;
+      final data = _parseData(response.data, context: 'auth-login');
+      final userRaw = data['user'];
+      if (userRaw == null || userRaw is! Map) {
+        throw Exception('auth-login: missing user in response');
+      }
       final user = AuthUser.fromJson({
-        ...data['user'] as Map<String, dynamic>,
+        ...Map<String, dynamic>.from(userRaw),
         'station_code': stationCode,
         'station_name': curStation?.stationName ?? '',
         'access_token': data['access_token'],
@@ -114,30 +139,6 @@ class AuthService {
     }
   }
 
-  /// Step 2b: Creditor login - just validates phone number, no Supabase Auth needed
-  /// Returns credit summary for the phone number at that station
-  Future<Map<String, dynamic>> loginCreditor({
-    required String phoneNumber,
-  }) async {
-    final db = TenantService.instance.client;
-
-    // Creditors use anon access - RLS policy allows reading own credit data by phone
-    final data = await db
-        .from('CreditCustomer')
-        .select('id, name, customer_code, phone_number, advance_balance')
-        .eq('phone_number', phoneNumber.trim())
-        .eq('active', true)
-        .maybeSingle();
-
-    if (data == null) {
-      throw Exception(
-        'No credit account found for this phone number at this station.',
-      );
-    }
-
-    return data;
-  }
-
   /// Restore session on app launch
   Future<AuthUser?> restoreSession() async {
     // Try to restore tenant connection
@@ -146,7 +147,7 @@ class AuthService {
 
     // Restore user from secure storage
     final userJson =
-        await _storage.read(key: StorageKeys.userSession + '_user');
+        await _storage.read(key: '${StorageKeys.userSession}_user');
     if (userJson == null) return null;
 
     final user = AuthUser.fromJsonString(userJson);
@@ -163,12 +164,12 @@ class AuthService {
   Future<void> logout() async {
     _currentUser = null;
     await TenantService.instance.clearTenant();
-    await _storage.delete(key: StorageKeys.userSession + '_user');
+    await _storage.delete(key: '${StorageKeys.userSession}_user');
   }
 
   Future<void> _persistUser(AuthUser user) async {
     await _storage.write(
-      key: StorageKeys.userSession + '_user',
+      key: '${StorageKeys.userSession}_user',
       value: user.toJsonString(),
     );
   }
@@ -181,25 +182,48 @@ class DealerSetupService {
 
   /// Register a new dealer station.
   /// Called during first-time dealer signup.
+  ///
+  /// [dbMode] is 'byo' (default) or 'managed'.
+  /// For 'managed', [supabaseUrl] and [anonKey] are ignored.
   Future<AuthUser> signupDealer({
     required String stationCode,
     required String stationName,
     required String ownerName,
     required String phone,
     required String password,
-    required String supabaseUrl,
-    required String anonKey,
+    String supabaseUrl = '',
+    String anonKey = '',
+    String dbMode = 'byo',
     // Optional additional station details
     String? address,
     String? city,
     String? state,
   }) async {
-    // 1. Configure tenant with provided Supabase credentials
+    // Resolve which Supabase project to use.
+    // managed → FuelOS-owned shared project (all managed dealers share one DB).
+    // byo     → dealer's own Supabase project (URL/key provided by user).
+    final String resolvedUrl;
+    final String resolvedAnonKey;
+    if (dbMode == 'managed') {
+      if (!AppConstants.hasManagedDealer) {
+        throw Exception(
+          'Managed onboarding is not available in this build. '
+          'Please use "Connect My Own Supabase" or contact FuelOS support.',
+        );
+      }
+      resolvedUrl = AppConstants.managedDealerUrl;
+      resolvedAnonKey = AppConstants.managedDealerAnonKey;
+    } else {
+      resolvedUrl = supabaseUrl.trim();
+      resolvedAnonKey = anonKey.trim();
+    }
+
+    // 1. Configure tenant with the resolved Supabase credentials
     final entry = StationRegistryEntry(
       stationCode: stationCode.trim().toUpperCase(),
       stationName: stationName.trim(),
-      supabaseUrl: supabaseUrl.trim(),
-      anonKey: anonKey.trim(),
+      supabaseUrl: resolvedUrl,
+      anonKey: resolvedAnonKey,
     );
     await TenantService.instance.configure(entry);
 
@@ -219,23 +243,30 @@ class DealerSetupService {
       },
     );
 
+    debugPrint('auth-signup-dealer response.data=${response.data.toString()} type=${response.data.runtimeType}');
     if (response.status != 200) {
-      throw Exception(response.data?['error'] ?? 'Signup failed');
+      throw Exception(
+        _errorFrom(response.data, fallback: 'Signup failed'),
+      );
     }
 
-    final data = response.data as Map<String, dynamic>;
+    final data = _parseData(response.data, context: 'auth-signup-dealer');
+    final userRaw = data['user'];
+    if (userRaw == null || userRaw is! Map) {
+      throw Exception('auth-signup-dealer: missing user in response');
+    }
 
-    // 3. Register in central PUMPora registry
+    // 3. Register in central registry (maps station_code → resolved Supabase project)
     await RegistryService.instance.registerStation(
       stationCode: stationCode.trim().toUpperCase(),
       stationName: stationName.trim(),
-      supabaseUrl: supabaseUrl.trim(),
-      anonKey: anonKey.trim(),
+      supabaseUrl: resolvedUrl,
+      anonKey: resolvedAnonKey,
     );
 
     // 4. Return authenticated user
     final user = AuthUser.fromJson({
-      ...data['user'] as Map<String, dynamic>,
+      ...Map<String, dynamic>.from(userRaw),
       'station_code': stationCode,
       'station_name': stationName,
       'access_token': data['access_token'],

@@ -1,0 +1,37 @@
+Analyzing fuelnest...                                           
+
+   info • Use 'const' with the constructor to improve performance • lib/core/providers/auth_provider.dart:160:13 • prefer_const_constructors
+   info • Use interpolation to compose strings and values • lib/core/services/auth_service.dart:125:34 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values • lib/core/services/auth_service.dart:142:32 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values • lib/core/services/auth_service.dart:147:12 • prefer_interpolation_to_compose_strings
+   info • Statements in an if should be enclosed in a block • lib/features/credit/screens/credit_management_screen.dart:399:39 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block • lib/features/credit/screens/credit_management_screen.dart:604:33 • curly_braces_in_flow_control_structures
+warning • The value of the local variable 'phone' isn't used • lib/features/credit/screens/credit_management_screen.dart:772:11 • unused_local_variable
+   info • Statements in an if should be enclosed in a block • lib/features/credit/screens/credit_management_screen.dart:786:7 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block • lib/features/credit/screens/credit_management_screen.dart:789:7 • curly_braces_in_flow_control_structures
+warning • The value of the local variable 'cap' isn't used • lib/features/dashboard/screens/dashboard_screen.dart:152:15 • unused_local_variable
+   info • The constant name '__' isn't a lowerCamelCase identifier • lib/features/expenses/screens/expenses_screen.dart:428:26 • constant_identifier_names
+   info • The variable name '__' isn't a lowerCamelCase identifier • lib/features/expenses/screens/expenses_screen.dart:428:26 • non_constant_identifier_names
+   info • Statements in an if should be enclosed in a block • lib/features/hardware/screens/hardware_config_screen.dart:63:7 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block • lib/features/hardware/screens/hardware_config_screen.dart:66:7 • curly_braces_in_flow_control_structures
+   info • Use 'const' with the constructor to improve performance • lib/features/hardware/screens/hardware_config_screen.dart:108:41 • prefer_const_constructors
+   info • Statements in a for should be enclosed in a block • lib/features/hardware/screens/hardware_config_screen.dart:179:42 • curly_braces_in_flow_control_structures
+   info • Statements in a for should be enclosed in a block • lib/features/hardware/screens/hardware_config_screen.dart:206:9 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block • lib/features/hardware/screens/hardware_config_screen.dart:240:9 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block • lib/features/hardware/screens/hardware_config_screen.dart:246:9 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block • lib/features/hardware/screens/hardware_config_screen.dart:254:7 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block • lib/features/hardware/screens/hardware_config_screen.dart:257:7 • curly_braces_in_flow_control_structures
+warning • The value of the local variable 'dips' isn't used • lib/features/inventory/screens/tank_dashboard_screen.dart:152:13 • unused_local_variable
+warning • The value of the field '_error' isn't used • lib/features/inventory/screens/tank_dashboard_screen.dart:766:11 • unused_field
+   info • Statements in a for should be enclosed in a block • lib/features/shifts/screens/payment_reconciliation_screen.dart:39:48 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block • lib/features/shifts/screens/payment_reconciliation_screen.dart:85:7 • curly_braces_in_flow_control_structures
+warning • The value of the local variable 'user' isn't used • lib/features/shifts/screens/payment_reconciliation_screen.dart:114:13 • unused_local_variable
+warning • The value of the local variable 'amount' isn't used • lib/features/shifts/screens/payment_reconciliation_screen.dart:120:15 • unused_local_variable
+   info • Statements in an if should be enclosed in a block • lib/features/shifts/screens/payment_reconciliation_screen.dart:167:7 • curly_braces_in_flow_control_structures
+warning • The declaration '_d' isn't referenced • lib/features/shifts/screens/payment_reconciliation_screen.dart:395:8 • unused_element
+warning • The value of the field '_litresFmt' isn't used • lib/features/shifts/screens/shift_list_screen.dart:37:16 • unused_field
+warning • The value of the field '_closing' isn't used • lib/features/worker/screens/worker_home_screen.dart:720:14 • unused_field
+warning • The declaration '_submitReadings' isn't referenced • lib/features/worker/screens/worker_home_screen.dart:753:16 • unused_element
+warning • The value of the local variable 'user' isn't used • lib/features/worker/screens/worker_home_screen.dart:1054:11 • unused_local_variable
+
+33 issues found. (ran in 2.9s)

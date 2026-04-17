@@ -12,10 +12,13 @@
     <!-- Network -->
     <key>com.apple.security.network.client</key>
     <true/>
-    <!-- Keychain -->
-    <key>com.apple.security.keychain-access-groups</key>
+    <!-- Keychain Sharing: required by flutter_secure_storage on macOS.
+         $(AppIdentifierPrefix) expands to "TEAMID." at build time, which
+         requires DEVELOPMENT_TEAM to be set in the Xcode target.
+         See: Xcode → Runner target → Signing & Capabilities → Team. -->
+    <key>keychain-access-groups</key>
     <array>
-        <string>$(AppIdentifierPrefix)com.fuelos.app</string>
+        <string>$(AppIdentifierPrefix)$(CFBundleIdentifier)</string>
     </array>
 </dict>
 </plist>

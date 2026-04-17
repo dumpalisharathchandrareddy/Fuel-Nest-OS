@@ -117,7 +117,7 @@ class _TankDashboardScreenState extends ConsumerState<TankDashboardScreen> {
         db
             .from('FuelOrder')
             .select(
-                'id, fuel_type, quantity, total_amount, vendor, status, date')
+                'id, total_liters, total_amount, vendor, status, date')
             .eq('station_id', user.stationId)
             .order('date', ascending: false)
             .limit(10),
@@ -239,10 +239,17 @@ class _TankDashboardScreenState extends ConsumerState<TankDashboardScreen> {
             children: [
               const SectionHeader(title: 'Tank Status'),
               const SizedBox(height: 12),
-              ..._tanks.map((t) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _TankCard(tank: t),
-                  )),
+              if (_tanks.isEmpty)
+                const EmptyView(
+                  title: 'No tanks configured',
+                  subtitle: 'Contact support to configure your fuel tanks',
+                  icon: Icons.water_outlined,
+                )
+              else
+                ..._tanks.map((t) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _TankCard(tank: t),
+                    )),
               const SizedBox(height: 20),
               SectionHeader(
                   title: 'Recent Orders',
@@ -250,12 +257,13 @@ class _TankDashboardScreenState extends ConsumerState<TankDashboardScreen> {
                   onAction: () => context.go('/app/inventory/order')),
               const SizedBox(height: 12),
               if (_orders.isEmpty)
-                const Center(
-                    child: Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Text('No orders yet',
-                            style: TextStyle(color: AppColors.textMuted)))),
-              ..._orders.take(5).map((o) => Padding(
+                const EmptyView(
+                  title: 'No orders yet',
+                  subtitle: 'Tap + New to record a fuel order',
+                  icon: Icons.inventory_2_outlined,
+                )
+              else
+                ..._orders.take(5).map((o) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: AppCard(
                         child: Row(children: [
@@ -293,7 +301,14 @@ class _TankDashboardScreenState extends ConsumerState<TankDashboardScreen> {
                   action: '+ New',
                   onAction: () => context.go('/app/inventory/cheque')),
               const SizedBox(height: 12),
-              ..._cheques.take(5).map((c) => Padding(
+              if (_cheques.isEmpty)
+                const EmptyView(
+                  title: 'No cheques recorded',
+                  subtitle: 'Tap + New to add a vendor cheque',
+                  icon: Icons.receipt_outlined,
+                )
+              else
+                ..._cheques.take(5).map((c) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: AppCard(
                         child: Row(children: [
@@ -663,7 +678,7 @@ class _ChequeEntryScreenState extends ConsumerState<ChequeEntryScreen> {
         'bank_name': _bankCtrl.text.trim(),
         'payment_date': _dueDate.toIso8601String().split('T')[0],
         'status': 'PENDING',
-        'created_by': user.id,
+        'created_by_id': user.id,
         'created_at': DateTime.now().toUtc().toIso8601String(),
       });
       if (mounted) context.go('/app/inventory');
@@ -826,7 +841,7 @@ class _DipReadingScreenState extends ConsumerState<DipReadingScreen> {
           'station_id': user.stationId,
           'tank_id': id,
           'calculated_volume': newStock,
-          'recorded_by': user.id,
+          'captured_by_id': user.id,
           'created_at': now
         });
       }

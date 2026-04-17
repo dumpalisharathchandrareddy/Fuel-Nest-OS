@@ -72,7 +72,14 @@ class _HardwareConfigScreenState extends ConsumerState<HardwareConfigScreen> {
       body: ListView(padding: const EdgeInsets.all(16), children: [
         const SectionHeader(title: 'Pumps & Nozzles'),
         const SizedBox(height: 12),
-        ..._pumps.map((p) => Padding(
+        if (_pumps.isEmpty)
+          const EmptyView(
+            title: 'No pumps configured yet',
+            subtitle: 'Contact support to add pumps and nozzles',
+            icon: Icons.local_gas_station_outlined,
+          )
+        else
+          ..._pumps.map((p) => Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: AppCard(
                 child: Column(
@@ -124,7 +131,14 @@ class _HardwareConfigScreenState extends ConsumerState<HardwareConfigScreen> {
         const SizedBox(height: 20),
         const SectionHeader(title: 'Tanks'),
         const SizedBox(height: 12),
-        ..._tanks.map((t) => Padding(
+        if (_tanks.isEmpty)
+          const EmptyView(
+            title: 'No tanks configured yet',
+            subtitle: 'Contact support to configure your fuel tanks',
+            icon: Icons.water_outlined,
+          )
+        else
+          ..._tanks.map((t) => Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: AppCard(
                 child: Row(children: [
@@ -274,7 +288,14 @@ class _FuelRateScreenState extends ConsumerState<FuelRateScreen> {
                       height: 1.4)))
         ])),
         const SizedBox(height: 20),
-        ..._rates.map((r) {
+        if (_rates.isEmpty)
+          const EmptyView(
+            title: 'No fuel rates configured',
+            subtitle: 'Rates appear here once tanks are configured',
+            icon: Icons.currency_rupee,
+          )
+        else
+          ..._rates.map((r) {
           final fuel = r['fuel_type'] as String;
           final fuelColor = switch (fuel) {
             'Petrol' => AppColors.petrol,

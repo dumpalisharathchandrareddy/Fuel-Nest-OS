@@ -101,7 +101,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         final payouts = await db
             .from('SalaryPayout')
             .select(
-                'id, net_paid, base_salary_snapshot, incentives, other_deductions, period_label, month, year, status, created_at, user:User(full_name, role, employee_id)')
+                'id, net_paid, base_salary_snapshot, incentives, other_deductions, period_label, month, year, status, created_at, user:User!SalaryPayout_user_id_fkey(full_name, role, employee_id)')
             .eq('station_id', user.stationId)
             .eq('month', int.parse(_monthValue.split('-')[1]))
             .eq('year', int.parse(_monthValue.split('-')[0]))

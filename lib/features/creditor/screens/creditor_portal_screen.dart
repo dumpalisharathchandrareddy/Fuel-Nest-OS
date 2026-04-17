@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/models/auth_user.dart';
 import '../../../core/services/registry_service.dart';
 import '../../../core/services/tenant_service.dart';
 import '../../../core/utils/currency.dart';
@@ -30,6 +32,10 @@ class _CreditorPortalScreenState extends ConsumerState<CreditorPortalScreen> {
   // Step 2 – phone
   final _phoneCtrl = TextEditingController();
 
+  // Isolated client for this creditor lookup — never touches the app-wide tenant.
+  SupabaseClient? _creditorClient;
+  StationRegistryEntry? _creditorEntry;
+
   // Step 3 – data
   Map<String, dynamic>? _customer;
   List<dynamic> _transactions = [];
@@ -39,6 +45,7 @@ class _CreditorPortalScreenState extends ConsumerState<CreditorPortalScreen> {
   void dispose() {
     _stationCtrl.dispose();
     _phoneCtrl.dispose();
+    _creditorClient = null;
     super.dispose();
   }
 
@@ -52,7 +59,8 @@ class _CreditorPortalScreenState extends ConsumerState<CreditorPortalScreen> {
       final entry = await RegistryService.instance
           .lookupStation(_stationCtrl.text.trim().toUpperCase());
       if (entry == null) throw Exception('Station not found');
-      await TenantService.instance.configure(entry);
+      _creditorClient = TenantService.instance.createTemporaryClient(entry);
+      _creditorEntry = entry;
       setState(() {
         _stationName = entry.stationName;
         _step = _CreditorStep.enterPhone;
@@ -66,21 +74,6 @@ class _CreditorPortalScreenState extends ConsumerState<CreditorPortalScreen> {
     }
   }
 
-  Future<String?> _getStationId() async {
-    try {
-      final db = TenantService.instance.client;
-      final row = await db
-          .from('FuelStation')
-          .select('id')
-          .eq('station_code',
-              TenantService.instance.currentStation?.stationCode ?? '')
-          .single();
-      return row['id'] as String?;
-    } catch (_) {
-      return null;
-    }
-  }
-
   Future<void> _lookupPhone() async {
     if (_phoneCtrl.text.trim().isEmpty) return;
     setState(() {
@@ -88,53 +81,34 @@ class _CreditorPortalScreenState extends ConsumerState<CreditorPortalScreen> {
       _error = null;
     });
     try {
-      final db = TenantService.instance.client;
+      final db = _creditorClient!;
       final phone = _phoneCtrl.text.trim();
+      final stationCode = _creditorEntry!.stationCode;
 
-      // Use SECURITY DEFINER function — CreditCustomer is not open to anon.
-      // fuelos_creditor_lookup(station_id, phone) → returns customer row if phone matches.
-      final stationId = TenantService.instance.currentStation != null
-          ? await _getStationId()
-          : null;
-      if (stationId == null) throw Exception('Station not found');
-
-      final lookupResult = await db.rpc('fuelos_creditor_lookup', params: {
-        'p_station_id': stationId,
+      final result = await db.rpc('fuelos_creditor_portal_data', params: {
+        'p_station_code': stationCode,
         'p_phone': phone,
-      });
-      final rows = lookupResult as List?;
-      final customer = (rows?.isNotEmpty == true)
-          ? rows!.first as Map<String, dynamic>
-          : null;
+      }) as Map<String, dynamic>?;
 
-      if (customer == null) {
+      if (result == null || result['found'] != true) {
         throw Exception(
             'No credit account found for $phone at ${_stationName ?? "this station"}');
       }
 
-      // Fetch via SECURITY DEFINER functions (anon can't read tables directly)
-      final customerId = customer['id'] as String;
-      final txResult = await db.rpc('fuelos_creditor_transactions', params: {
-        'p_station_id': stationId,
-        'p_customer_id': customerId,
-      });
-      final pyResult = await db.rpc('fuelos_creditor_payments', params: {
-        'p_station_id': stationId,
-        'p_customer_id': customerId,
-      });
+      final customer =
+          Map<String, dynamic>.from(result['customer'] as Map);
+      final txList = (result['transactions'] as List?) ?? [];
+      final pyList = (result['payments'] as List?) ?? [];
 
-      final txList = txResult as List? ?? [];
-      final pyList = pyResult as List? ?? [];
-
-      // Compute outstanding from latest remaining_balance
       final latestTx = txList.isNotEmpty ? txList.first as Map : null;
       customer['total_due'] = latestTx != null
-          ? double.tryParse(latestTx['remaining_balance']?.toString() ?? '0') ??
+          ? double.tryParse(
+                  latestTx['remaining_balance']?.toString() ?? '0') ??
               0
           : 0.0;
 
       setState(() {
-        _customer = Map<String, dynamic>.from(customer);
+        _customer = customer;
         _transactions = txList;
         _payments = pyList;
         _step = _CreditorStep.viewBalance;
@@ -149,6 +123,8 @@ class _CreditorPortalScreenState extends ConsumerState<CreditorPortalScreen> {
   }
 
   void _reset() {
+    _creditorClient = null;
+    _creditorEntry = null;
     setState(() {
       _step = _CreditorStep.enterStation;
       _stationCtrl.clear();

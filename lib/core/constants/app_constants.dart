@@ -10,13 +10,31 @@ class AppConstants {
   static const appTagline = 'Fuel Station Management, Simplified';
   static const appVersion = '1.0.0';
 
-  // ── Registry (PUMPora central - baked into app build) ────────────────────
-  // This is YOUR Supabase project URL - the central station registry
-  // Each dealer looks up their own Supabase via their station code from here
+  // ── Registry Supabase (FuelOS-owned central lookup project) ─────────────
+  // Supabase project that maps station_code → dealer's Supabase URL.
+  // Used only for station code lookup at login and station registration at signup.
+  // Pass at build time:
+  //   --dart-define=REGISTRY_URL=https://xxxx.supabase.co
+  //   --dart-define=REGISTRY_ANON_KEY=eyJ...
   static const registrySupabaseUrl = String.fromEnvironment('REGISTRY_URL');
   static const registryAnonKey = String.fromEnvironment('REGISTRY_ANON_KEY');
   static bool get hasRegistry =>
       registrySupabaseUrl.isNotEmpty && registryAnonKey.isNotEmpty;
+
+  // ── Managed Dealer Supabase (FuelOS-owned shared dealer data project) ───
+  // Supabase project that hosts station data for dealers who chose "managed mode".
+  // All managed dealers share this single Supabase project; stations are isolated
+  // by station_id within it (RLS enforced).
+  // BYO dealers use their own Supabase URL instead — this is never used for them.
+  // Pass at build time:
+  //   --dart-define=MANAGED_DEALER_URL=https://yyyy.supabase.co
+  //   --dart-define=MANAGED_DEALER_ANON_KEY=eyJ...
+  static const managedDealerUrl =
+      String.fromEnvironment('MANAGED_DEALER_URL');
+  static const managedDealerAnonKey =
+      String.fromEnvironment('MANAGED_DEALER_ANON_KEY');
+  static bool get hasManagedDealer =>
+      managedDealerUrl.isNotEmpty && managedDealerAnonKey.isNotEmpty;
 
   // ── India Time ───────────────────────────────────────────────────────────
   static const defaultTimezone = 'Asia/Kolkata';

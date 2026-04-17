@@ -29,10 +29,13 @@ class AuthState {
   bool get isManager => user?.isManager ?? false;
   bool get isStaff => user?.isStaff ?? false;
 
+  static const _unset = Object();
+
+  // Passing error: null explicitly clears it; omitting error preserves it.
   AuthState copyWith({
     AuthUser? user,
     bool? isLoading,
-    String? error,
+    Object? error = _unset,
     String? stationCode,
     String? stationName,
     bool? stationConfigured,
@@ -41,7 +44,7 @@ class AuthState {
       AuthState(
         user: user ?? this.user,
         isLoading: isLoading ?? this.isLoading,
-        error: error,
+        error: identical(error, _unset) ? this.error : error as String?,
         stationCode: stationCode ?? this.stationCode,
         stationName: stationName ?? this.stationName,
         stationConfigured: stationConfigured ?? this.stationConfigured,
@@ -134,6 +137,47 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return true;
     } catch (e) {
       state = state.withError(e.toString().replaceAll('Exception: ', ''));
+      return false;
+    }
+  }
+
+  /// Dealer signup — calls DealerSetupService and updates auth state on success.
+  Future<bool> signup({
+    required String stationCode,
+    required String stationName,
+    required String ownerName,
+    required String phone,
+    required String password,
+    String supabaseUrl = '',
+    String anonKey = '',
+    String dbMode = 'byo',
+    String? city,
+    String? state,
+  }) async {
+    this.state = this.state.withLoading();
+    try {
+      final user = await DealerSetupService.instance.signupDealer(
+        stationCode: stationCode,
+        stationName: stationName,
+        ownerName: ownerName,
+        phone: phone,
+        password: password,
+        supabaseUrl: supabaseUrl,
+        anonKey: anonKey,
+        dbMode: dbMode,
+        city: city,
+        state: state,
+      );
+      this.state = AuthState(
+        user: user,
+        stationCode: user.stationCode,
+        stationName: user.stationName,
+        stationConfigured: true,
+      );
+      return true;
+    } catch (e) {
+      this.state =
+          this.state.withError(e.toString().replaceAll('Exception: ', ''));
       return false;
     }
   }

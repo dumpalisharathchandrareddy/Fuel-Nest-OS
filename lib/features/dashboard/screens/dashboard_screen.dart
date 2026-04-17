@@ -61,7 +61,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             'tanks': [
               {
                 'id': 't1', 'name': 'Main Petrol', 'fuel_type': 'Petrol',
-                'capacity_liters': 20000.0, 'current_stock': 12000.0,
+                'capacity_liters': 20000.0, 'computed_stock': 12000.0,
                 'low_stock_threshold': 5000.0,
               },
             ],
@@ -91,7 +91,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         db
             .from('Shift')
             .select(
-                'id, status, sale_amount, pump:Pump(name), assigned_worker:User(full_name)')
+                'id, status, pump:Pump(name), assigned_worker:User(full_name), nozzle_entries:NozzleEntry(sale_amount)')
             .eq('station_id', user.stationId)
             .eq('status', 'OPEN'),
         db
@@ -101,7 +101,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             .eq('status', 'CLOSED'),
         db
             .from('Tank')
-            .select('id, name, fuel_type, capacity_liters, current_stock, low_stock_threshold')
+            .select('id, name, fuel_type, capacity_liters, low_stock_threshold')
             .eq('station_id', user.stationId)
             .eq('active', true),
         db
@@ -126,6 +126,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             .select('id, name, provider_type, active')
             .eq('station_id', user.stationId)
             .eq('active', true),
+        db
+            .from('TankInitialStock')
+            .select('tank_id, opening_litres')
+            .eq('station_id', user.stationId),
+        db
+            .from('StockTransaction')
+            .select('tank_id, quantity')
+            .eq('station_id', user.stationId),
       ]);
 
       final activeShifts = results[0] as List;
@@ -135,6 +143,26 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       final todayShifts = results[4] as List;
       final staff = results[5] as List;
       final pumps = results[6] as List;
+      final initialStocks = {
+        for (final s in results[7] as List)
+          (s as Map)['tank_id']: double.tryParse(s['opening_litres']?.toString() ?? '0') ?? 0.0
+      };
+      final transactions = results[8] as List;
+
+      final tankStocks = <String, double>{};
+      for (final t in tanks) {
+        final tid = t['id'] as String;
+        double stock = initialStocks[tid] ?? 0.0;
+        for (final tx in transactions) {
+          if (tx['tank_id'] == tid) {
+            stock += double.tryParse(tx['quantity']?.toString() ?? '0') ?? 0;
+          }
+        }
+        tankStocks[tid] = stock;
+      }
+      final tanksWithStock = tanks
+          .map((t) => {...t, 'computed_stock': tankStocks[t['id']] ?? 0.0})
+          .toList();
 
       final todayRevenue = todayShifts.fold<double>(0, (sum, s) {
         final entries = (s['nozzle_entries'] as List? ?? []);
@@ -148,10 +176,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         0));
       });
 
-      final lowTanks = tanks.where((t) {
-        final cap =
-            double.tryParse(t['capacity_liters']?.toString() ?? '0') ?? 0;
-        final cur = double.tryParse(t['current_stock']?.toString() ?? '0') ?? 0;
+      final lowTanks = tanksWithStock.where((t) {
+        final cur = (t['computed_stock'] as double?) ?? 0;
         final reorder =
             double.tryParse(t['low_stock_threshold']?.toString() ?? '0') ?? 0;
         return reorder > 0 && cur <= reorder;
@@ -164,7 +190,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           'lowStockAlerts': lowTanks.length,
           'totalCreditsPending': credits.length,
           'todayRevenue': todayRevenue,
-          'tanks': tanks,
+          'tanks': tanksWithStock,
           'lowTanks': lowTanks,
           'staff': staff,
           'pumps': pumps,
@@ -335,18 +361,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ),
             ),
           ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-            sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (_, i) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _TankCard(tank: (d['tanks'] as List)[i]),
+          if ((d['tanks'] as List).isEmpty)
+            const SliverPadding(
+              padding: EdgeInsets.fromLTRB(20, 12, 20, 20),
+              sliver: SliverFillRemaining(
+                hasScrollBody: false,
+                child: EmptyView(
+                  title: 'No tanks configured',
+                  subtitle: 'Tank levels will appear here once configured',
+                  icon: Icons.water_outlined,
                 ),
-                childCount: ((d['tanks'] as List)).length,
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (_, i) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _TankCard(tank: (d['tanks'] as List)[i]),
+                  ),
+                  childCount: ((d['tanks'] as List)).length,
+                ),
               ),
             ),
-          ),
 
           SliverToBoxAdapter(
             child: Padding(
@@ -490,7 +529,7 @@ class _TankCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cap =
         double.tryParse(tank['capacity_liters']?.toString() ?? '0') ?? 0;
-    final cur = double.tryParse(tank['current_stock']?.toString() ?? '0') ?? 0;
+    final cur = (tank['computed_stock'] as num?)?.toDouble() ?? 0.0;
     final pct = cap > 0 ? (cur / cap).clamp(0.0, 1.0) : 0.0;
     final isLow = pct < 0.2;
 
