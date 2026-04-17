@@ -6,6 +6,7 @@ import '../../../core/providers/auth_provider.dart';
 import '../../../core/services/tenant_service.dart';
 import '../../../core/utils/ist_time.dart';
 import '../../../core/utils/currency.dart';
+import 'package:uuid/uuid.dart';
 import '../../../shared/widgets/widgets.dart';
 
 const _kCategories = [
@@ -845,9 +846,11 @@ class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
                     .update(payload)
                     .eq('id', widget.existing!['id']);
               } else {
-                await db
-                    .from('DailyExpense')
-                    .insert({...payload, 'created_at': now});
+                await db.from('DailyExpense').insert({
+                  ...payload,
+                  'id': const Uuid().v4(),
+                  'created_at': now,
+                });
               }
               if (mounted) Navigator.pop(context, true);
             } catch (e) {

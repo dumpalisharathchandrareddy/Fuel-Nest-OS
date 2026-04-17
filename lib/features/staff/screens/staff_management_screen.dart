@@ -228,6 +228,7 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
         }
       } else {
         await db.from('StaffArchiveRequest').insert({
+          'id': const Uuid().v4(),
           'station_id': user.stationId,
           'target_user_id': staffMember['id'],
           'requested_by_id': user.id,
@@ -953,6 +954,7 @@ class _StaffFormSheetState extends ConsumerState<StaffFormSheet> {
                   });
                   if (salary > 0) {
                     await db.from('SalaryConfig').insert({
+                      'id': const Uuid().v4(),
                       'station_id': user.stationId,
                       'user_id': newUserId,
                       'base_monthly_salary': salary,

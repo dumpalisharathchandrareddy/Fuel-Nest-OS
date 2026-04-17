@@ -342,7 +342,7 @@ class _NozzleEntryScreenState extends ConsumerState<NozzleEntryScreen> {
       final shifts = await db
           .from('Shift')
           .select(
-              'id, status, created_at, sale_amount, nozzle_entries:NozzleEntry(id, nozzle_id, opening_reading, closing_reading, nozzle:Nozzle(label, fuel_type))')
+              'id, status, created_at, nozzle_entries:NozzleEntry(id, nozzle_id, opening_reading, closing_reading, nozzle:Nozzle(label, fuel_type))')
           .eq('pump_id', widget.pumpId)
           .eq('station_id', user.stationId)
           .eq('status', 'OPEN')
@@ -360,6 +360,14 @@ class _NozzleEntryScreenState extends ConsumerState<NozzleEntryScreen> {
 
       final shift = shifts.first;
       final entries = shift['nozzle_entries'] as List? ?? [];
+
+      if (entries.isEmpty) {
+        setState(() {
+          _error = 'No nozzles assigned to this pump. Only pumps with configured nozzles can accept entries.';
+          _loading = false;
+        });
+        return;
+      }
 
       final readings = entries.map<Map<String, dynamic>>((e) {
         final nozzle = e['nozzle'] as Map<String, dynamic>? ?? {};
@@ -746,7 +754,7 @@ class _ShiftExecutionScreenState extends ConsumerState<ShiftExecutionScreen> {
       final shift = await db
           .from('Shift')
           .select(
-              'id, status, sale_amount, created_at, business_date, pump:Pump(name), assigned_worker:User(full_name), nozzle_entries:NozzleEntry(id, opening_reading, closing_reading, sale_litres, sale_amount, rate, nozzle:Nozzle(label, fuel_type))')
+              'id, status, created_at, business_date, pump:Pump(name), assigned_worker:User(full_name), nozzle_entries:NozzleEntry(id, opening_reading, closing_reading, sale_litres, sale_amount, rate, nozzle:Nozzle(label, fuel_type))')
           .eq('id', widget.shiftId)
           .single();
       setState(() {

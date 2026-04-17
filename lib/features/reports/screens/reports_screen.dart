@@ -420,11 +420,19 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               AppColors.blue),
           _StatRow('Total Shifts', '${shifts.length}', AppColors.textPrimary),
           const Divider(height: 24, color: AppColors.border),
-          ...shifts.take(10).map((s) => _PreviewRow(
-              (s as Map)['business_date'] as String? ?? '',
-              (s['pump'] as Map?)?['name'] as String? ?? '',
-              IndianCurrency.format(
-                  double.tryParse(s['sale_amount']?.toString() ?? '0') ?? 0))),
+          ...shifts.take(10).map((s) {
+            final ne = (s as Map)['nozzle_entries'] as List? ?? [];
+            final total = ne.fold<double>(
+                0,
+                (p, e) =>
+                    p +
+                    (double.tryParse((e as Map)['sale_amount']?.toString() ??
+                            '0') ??
+                        0));
+            return _PreviewRow((s as Map)['business_date'] as String? ?? '',
+                (s['pump'] as Map?)?['name'] as String? ?? '',
+                IndianCurrency.format(total));
+          }),
           if (shifts.length > 10)
             Padding(
                 padding: const EdgeInsets.only(top: 8),

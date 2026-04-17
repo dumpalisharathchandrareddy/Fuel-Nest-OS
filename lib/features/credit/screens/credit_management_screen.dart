@@ -7,6 +7,7 @@ import '../../../core/providers/auth_provider.dart';
 import '../../../core/services/tenant_service.dart';
 import '../../../core/utils/ist_time.dart';
 import '../../../core/utils/currency.dart';
+import 'package:uuid/uuid.dart';
 import '../../../shared/widgets/widgets.dart';
 
 class CreditManagementScreen extends ConsumerStatefulWidget {
@@ -910,6 +911,7 @@ class _CreditEntrySheetState extends ConsumerState<CreditEntrySheet> {
                         final user = ref.read(currentUserProvider)!;
                         final now = DateTime.now().toUtc().toIso8601String();
                         await db.from('CreditTransaction').insert({
+                          'id': const Uuid().v4(),
                           'station_id': user.stationId,
                           'customer_id': selCustomer!['id'],
                           'amount': amt,
@@ -1101,6 +1103,7 @@ class _CreditPaymentSheetState extends ConsumerState<CreditPaymentSheet> {
                   final user = ref.read(currentUserProvider)!;
                   final now = DateTime.now().toUtc().toIso8601String();
                   await db.from('CreditPayment').insert({
+                    'id': const Uuid().v4(),
                     'station_id': user.stationId,
                     'customer_id': widget.customer['id'],
                     'amount': amt,
@@ -1239,6 +1242,7 @@ class _CustomerFormSheetState extends ConsumerState<CustomerFormSheet> {
                     final code =
                         'CC-${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}';
                     await db.from('CreditCustomer').insert({
+                      'id': const Uuid().v4(),
                       'station_id': user.stationId,
                       'full_name': nameCtrl.text.trim(),
                       'phone_number': phoneCtrl.text.trim(),

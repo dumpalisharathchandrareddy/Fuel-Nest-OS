@@ -74,7 +74,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
           isDemoMode: user.id == 'demo-user-id',
         );
       } else {
-        state = const AuthState();
+        // Full session not found; check if a station is at least configured
+        final curStation = TenantService.instance.currentStation;
+        if (curStation != null) {
+          state = AuthState(
+            stationCode: curStation.stationCode,
+            stationName: curStation.stationName,
+            stationConfigured: true,
+          );
+        } else {
+          state = const AuthState();
+        }
       }
     } catch (e) {
       state = const AuthState();
@@ -214,7 +224,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     );
   }
 
-  void clearStation() {
+  Future<void> clearStation() async {
+    await TenantService.instance.fullReset();
     state = const AuthState();
   }
 }

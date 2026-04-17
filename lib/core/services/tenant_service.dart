@@ -47,6 +47,10 @@ class TenantService {
       key: StorageKeys.stationCode,
       value: entry.stationCode,
     );
+    await _storage.write(
+      key: StorageKeys.stationName,
+      value: entry.stationName,
+    );
 
     _currentStation = entry;
     _tenantClient = SupabaseClient(entry.supabaseUrl, entry.anonKey);
@@ -72,13 +76,14 @@ class TenantService {
     final url = await _storage.read(key: StorageKeys.tenantUrl);
     final anonKey = await _storage.read(key: StorageKeys.tenantAnonKey);
     final stationCode = await _storage.read(key: StorageKeys.stationCode);
+    final stationName = await _storage.read(key: StorageKeys.stationName);
 
     if (url == null || anonKey == null || stationCode == null) return null;
 
     _tenantClient = SupabaseClient(url, anonKey);
     _currentStation = StationRegistryEntry(
       stationCode: stationCode,
-      stationName: '', // loaded later from DB
+      stationName: stationName ?? '',
       supabaseUrl: url,
       anonKey: anonKey,
     );
@@ -120,10 +125,9 @@ class TenantService {
     try {
       await _tenantClient?.auth.signOut();
     } catch (_) {}
-    _tenantClient = null;
-    _currentStation = null;
+    // We KEEP _tenantClient and _currentStation in memory
+    // so the station remains "configured" for the next login
     await _storage.delete(key: StorageKeys.userSession);
-    // Keep station code so user doesn't have to re-enter
   }
 
   /// Full reset - clear everything including station code.

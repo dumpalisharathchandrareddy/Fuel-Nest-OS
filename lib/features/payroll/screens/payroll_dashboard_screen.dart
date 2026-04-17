@@ -7,6 +7,7 @@ import '../../../core/services/tenant_service.dart';
 import '../../../core/services/discord_service.dart';
 import '../../../core/utils/currency.dart';
 import '../../../core/utils/ist_time.dart';
+import 'package:uuid/uuid.dart';
 import '../../../shared/widgets/widgets.dart';
 
 class PayrollDashboardScreen extends ConsumerStatefulWidget {
@@ -83,6 +84,7 @@ class _PayrollDashboardScreenState extends ConsumerState<PayrollDashboardScreen>
       final period = '${_monthName(now.month)} ${now.year}';
 
       await db.from('SalaryPayout').insert({
+        'id': const Uuid().v4(),
         'station_id': user.stationId,
         'user_id': staffMember['id'],
         'base_salary_snapshot': baseSalary,

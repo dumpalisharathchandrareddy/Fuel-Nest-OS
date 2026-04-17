@@ -7,6 +7,7 @@ import '../../../core/providers/auth_provider.dart';
 import '../../../core/services/tenant_service.dart';
 import '../../../core/utils/ist_time.dart';
 import '../../../core/utils/currency.dart';
+import 'package:uuid/uuid.dart';
 import '../../../shared/widgets/widgets.dart';
 
 enum _StatusFilter { active, closed, all }
@@ -168,7 +169,8 @@ class _ShiftListScreenState extends ConsumerState<ShiftListScreen>
               .from('User')
               .select('id, full_name, role')
               .eq('station_id', user.stationId)
-              .eq('active', true),
+              .eq('active', true)
+              .not('role', 'in', '("DEALER","MANAGER")'),
         ]);
         setState(() {
           _shifts = results[0] as List;
@@ -239,14 +241,36 @@ class _ShiftListScreenState extends ConsumerState<ShiftListScreen>
                               fontWeight: FontWeight.w700,
                               letterSpacing: 1)),
                       const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _pumps.map((p) {
-                          final id = p['id'] as String;
-                          final sel = selPumpId == id;
-                          return GestureDetector(
-                            onTap: () => ss(() => selPumpId = id),
+                      if (_pumps.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                              color: AppColors.bgSurface,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.border)),
+                          child: Column(children: [
+                            const Text('No active pumps configured',
+                                style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 13)),
+                            const SizedBox(height: 12),
+                            AppButton(
+                                label: 'Add Pump',
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  context.go('/hardware');
+                                }),
+                          ]),
+                        )
+                      else
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _pumps.map((p) {
+                            final id = p['id'] as String;
+                            final sel = selPumpId == id;
+                            return GestureDetector(
+                              onTap: () => ss(() => selPumpId = id),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 150),
                               padding: const EdgeInsets.symmetric(
@@ -277,38 +301,61 @@ class _ShiftListScreenState extends ConsumerState<ShiftListScreen>
                               fontWeight: FontWeight.w700,
                               letterSpacing: 1)),
                       const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        initialValue: selWorkerId,
-                        dropdownColor: AppColors.bgSurface,
-                        style: const TextStyle(
-                            color: AppColors.textPrimary, fontSize: 13),
-                        decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 12),
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide:
-                                  const BorderSide(color: AppColors.border)),
-                          enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide:
-                                  const BorderSide(color: AppColors.border)),
-                          filled: true,
-                          fillColor: AppColors.bgCard,
+                      if (_workers.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                              color: AppColors.bgSurface,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.border)),
+                          child: Column(children: [
+                            const Text('No eligible staff members available',
+                                style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 13)),
+                            const SizedBox(height: 12),
+                            AppButton(
+                                label: 'Add Staff',
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  context.go('/staff');
+                                }),
+                          ]),
+                        )
+                      else
+                        DropdownButtonFormField<String>(
+                          value: selWorkerId,
+                          dropdownColor: AppColors.bgSurface,
+                          style: const TextStyle(
+                              color: AppColors.textPrimary, fontSize: 13),
+                          decoration: InputDecoration(
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 12),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide:
+                                    const BorderSide(color: AppColors.border)),
+                            enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide:
+                                    const BorderSide(color: AppColors.border)),
+                            filled: true,
+                            fillColor: AppColors.bgCard,
+                            hintText: 'Select Staff Member',
+                          ),
+                          hint: const Text('Any staff member',
+                              style: TextStyle(
+                                  color: AppColors.textMuted, fontSize: 13)),
+                          items: [
+                            const DropdownMenuItem(
+                                value: null, child: Text('Unassigned')),
+                            ..._workers.map((w) => DropdownMenuItem<String>(
+                                value: w['id'] as String,
+                                child: Text(
+                                    '${w['full_name']} (${w['role'] == 'PUMP_PERSON' ? 'Staff' : w['role']})'))),
+                          ],
+                          onChanged: (v) => ss(() => selWorkerId = v),
                         ),
-                        hint: const Text('Any staff member',
-                            style: TextStyle(
-                                color: AppColors.textMuted, fontSize: 13)),
-                        items: [
-                          const DropdownMenuItem(
-                              value: null, child: Text('Unassigned')),
-                          ..._workers.map((w) => DropdownMenuItem<String>(
-                              value: w['id'] as String,
-                              child: Text(
-                                  '${w['full_name']} (${w['role'] == 'PUMP_PERSON' ? 'Staff' : w['role']})'))),
-                        ],
-                        onChanged: (v) => ss(() => selWorkerId = v),
-                      ),
                       if (launchErr != null) ...[
                         const SizedBox(height: 12),
                         Container(
@@ -367,6 +414,7 @@ class _ShiftListScreenState extends ConsumerState<ShiftListScreen>
                                     final newShift = await db
                                         .from('Shift')
                                         .insert({
+                                          'id': const Uuid().v4(),
                                           'station_id': user.stationId,
                                           'pump_id': selPumpId,
                                           if (selWorkerId != null)
@@ -384,6 +432,7 @@ class _ShiftListScreenState extends ConsumerState<ShiftListScreen>
                                           nozzle['fuel_type'] as String;
                                       final activeRate = rateMap[fuelType] ?? 0;
                                       await db.from('NozzleEntry').insert({
+                                        'id': const Uuid().v4(),
                                         'station_id': user.stationId,
                                         'shift_id': newShift['id'],
                                         'nozzle_id': nozzle['id'],

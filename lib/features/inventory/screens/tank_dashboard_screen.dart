@@ -6,6 +6,7 @@ import '../../../core/providers/auth_provider.dart';
 import '../../../core/services/tenant_service.dart';
 import '../../../core/services/discord_service.dart';
 import '../../../core/utils/currency.dart';
+import 'package:uuid/uuid.dart';
 import '../../../shared/widgets/widgets.dart';
 
 // ─── TankDashboardScreen ──────────────────────────────────────────────────────
@@ -476,6 +477,7 @@ class _FuelOrderScreenState extends ConsumerState<FuelOrderScreen> {
       final invoiceNo = _invoiceCtrl.text.trim();
 
       await db.from('FuelOrder').insert({
+        'id': const Uuid().v4(),
         'station_id': user.stationId,
         'invoice_no': invoiceNo,
         'total_liters': qty,
@@ -499,6 +501,7 @@ class _FuelOrderScreenState extends ConsumerState<FuelOrderScreen> {
           .maybeSingle();
       if (tank != null) {
         await db.from('StockTransaction').insert({
+          'id': const Uuid().v4(),
           'station_id': user.stationId,
           'tank_id': tank['id'],
           'type': 'DELIVERY',
@@ -671,6 +674,7 @@ class _ChequeEntryScreenState extends ConsumerState<ChequeEntryScreen> {
         return;
       }
       await db.from('InventoryCheque').insert({
+        'id': const Uuid().v4(),
         'station_id': user.stationId,
         'cheque_reference': _chequeNumCtrl.text.trim(),
         'amount': double.parse(_amtCtrl.text),
@@ -838,6 +842,7 @@ class _DipReadingScreenState extends ConsumerState<DipReadingScreen> {
         final id = t['id'] as String;
         final newStock = double.tryParse(_controllers[id]?.text ?? '0') ?? 0;
         await db.from('DipReading').insert({
+          'id': const Uuid().v4(),
           'station_id': user.stationId,
           'tank_id': id,
           'calculated_volume': newStock,

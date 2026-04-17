@@ -104,6 +104,9 @@ lcov.info
 *.dll
 *.so
 *.keystore
+*.jks
+*.p12
+*.pem
 
 # Supabase/Backend
 # Migrations are tracked via Git
@@ -176,4 +179,4 @@ android/build/
 node_modules/
 .claude/
 graphify-out/
-{lib/
+flutter_analyze_results.txt

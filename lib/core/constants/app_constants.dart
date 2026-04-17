@@ -92,6 +92,7 @@ class StorageKeys {
   StorageKeys._();
   // Secure storage
   static const stationCode = 'station_code';
+  static const stationName = 'station_name';
   static const tenantUrl = 'tenant_supabase_url';
   static const tenantAnonKey = 'tenant_anon_key';
   static const userSession = 'user_session';

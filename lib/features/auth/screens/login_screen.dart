@@ -17,11 +17,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _phoneCtrl = TextEditingController();
   final _credentialCtrl = TextEditingController();
   bool _usePin = true;
-  String _role = 'STAFF';
+  String _role = 'PUMP_PERSON';
 
   static const _roles = [
-    ('PUMP_PERSON', 'Worker'),
-    ('STAFF', 'Staff'),
+    ('PUMP_PERSON', 'Staff'),
     ('MANAGER', 'Manager'),
     ('DEALER', 'Dealer'),
   ];
@@ -76,9 +75,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 children: [
                   // Back to station code
                   GestureDetector(
-                    onTap: () {
-                      ref.read(authProvider.notifier).clearStation();
-                      context.go('/station');
+                    onTap: () async {
+                      await ref.read(authProvider.notifier).clearStation();
+                      if (mounted) context.go('/station');
                     },
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
