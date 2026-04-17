@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/auth_user.dart';
 import '../services/auth_service.dart';
@@ -60,12 +61,35 @@ class AuthState {
 class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier() : super(const AuthState());
 
-  /// Called on app launch - restore saved session
+  /// Called on app launch - restore saved technical + user state
   Future<void> initialize() async {
     state = state.withLoading();
     try {
+      // Step 1: Technical restoration (URL, Key, Code, Name)
+      debugPrint('INIT: Starting technical restoration...');
+      final stationCode = await TenantService.instance.restoreFromStorage();
+
+      if (stationCode == null) {
+        debugPrint('INIT: No technical station found in storage.');
+        state = const AuthState();
+        return;
+      }
+
+      final curStation = TenantService.instance.currentStation;
+      if (curStation == null) {
+        debugPrint('INIT: Technical restoration returned stationCode but currentStation is null. Resetting.');
+        await TenantService.instance.fullReset();
+        state = const AuthState();
+        return;
+      }
+      debugPrint('INIT: Technical restoration success for ${curStation.stationCode}');
+
+      // Step 2: User restoration (AuthUser)
+      debugPrint('INIT: Starting user session restoration...');
       final user = await AuthService.instance.restoreSession();
+
       if (user != null) {
+        debugPrint('INIT: Full session restored for ${user.fullName}');
         state = AuthState(
           user: user,
           stationCode: user.stationCode,
@@ -74,19 +98,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
           isDemoMode: user.id == 'demo-user-id',
         );
       } else {
-        // Full session not found; check if a station is at least configured
-        final curStation = TenantService.instance.currentStation;
-        if (curStation != null) {
-          state = AuthState(
-            stationCode: curStation.stationCode,
-            stationName: curStation.stationName,
-            stationConfigured: true,
-          );
-        } else {
-          state = const AuthState();
-        }
+        debugPrint('INIT: User session missing or expired; proceeding as guest at ${curStation.stationCode}');
+        state = AuthState(
+          stationCode: curStation.stationCode,
+          stationName: curStation.stationName,
+          stationConfigured: true,
+        );
       }
     } catch (e) {
+      debugPrint('INIT: Critical error during initialization: $e');
       state = const AuthState();
     }
   }
@@ -194,11 +214,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Logout
   Future<void> logout() async {
+    debugPrint('AUTH: Logging out user ${state.user?.fullName}');
     await AuthService.instance.logout();
     state = AuthState(
-      stationCode: state.stationCode, // keep station code
+      stationCode: state.stationCode,
       stationName: state.stationName,
-      stationConfigured: state.stationConfigured,
+      stationConfigured: true, // Keep it true as technical config remains
     );
   }
 

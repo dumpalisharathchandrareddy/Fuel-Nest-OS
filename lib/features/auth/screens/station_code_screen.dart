@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../shared/widgets/widgets.dart';
+import '../../../core/utils/validators.dart';
 
 class StationCodeScreen extends ConsumerStatefulWidget {
   const StationCodeScreen({super.key});
@@ -48,32 +50,34 @@ class _StationCodeScreenState extends ConsumerState<StationCodeScreen> {
         backgroundColor: AppColors.bgCard,
         title: const Text('Manual Configuration',
             style: TextStyle(color: AppColors.textPrimary)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Enter tenant database credentials directly.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: urlCtrl,
-              style: const TextStyle(color: AppColors.textPrimary),
-              decoration: const InputDecoration(
-                labelText: 'Supabase URL',
-                labelStyle: TextStyle(color: AppColors.textMuted),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Enter tenant database credentials directly.',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
               ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: keyCtrl,
-              style: const TextStyle(color: AppColors.textPrimary),
-              decoration: const InputDecoration(
-                labelText: 'Anon Key',
-                labelStyle: TextStyle(color: AppColors.textMuted),
+              const SizedBox(height: 16),
+              TextField(
+                controller: urlCtrl,
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: const InputDecoration(
+                  labelText: 'Supabase URL',
+                  labelStyle: TextStyle(color: AppColors.textMuted),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: keyCtrl,
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: const InputDecoration(
+                  labelText: 'Anon Key',
+                  labelStyle: TextStyle(color: AppColors.textMuted),
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -170,13 +174,11 @@ class _StationCodeScreenState extends ConsumerState<StationCodeScreen> {
                     prefixIcon: Icons.store_outlined,
                     textCapitalization: TextCapitalization.characters,
                     textInputAction: TextInputAction.done,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
+                    ],
                     onSubmitted: (_) => _proceed(),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) {
-                        return 'Please enter your station code';
-                      }
-                      return null;
-                    },
+                    validator: Validators.stationCode,
                   ),
 
                   if (auth.error != null) ...[

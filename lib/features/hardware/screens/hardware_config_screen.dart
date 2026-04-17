@@ -656,95 +656,98 @@ class _TankFormSheetState extends ConsumerState<TankFormSheet> {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Container(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 24),
       decoration: const BoxDecoration(
         color: AppColors.bgSurface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Icon(isEdit ? Icons.edit_outlined : Icons.add_circle_outline,
-                color: AppColors.blue, size: 22),
-            const SizedBox(width: 10),
-            Expanded(
-                child: Text(isEdit ? 'Edit Tank' : 'Add Tank',
-                    style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700))),
-            IconButton(
-                icon: const Icon(Icons.close,
-                    size: 20, color: AppColors.textMuted),
-                onPressed: () => Navigator.pop(context)),
-          ]),
-          const SizedBox(height: 20),
-          _Field(label: 'Tank Name (e.g. Tank 1)', ctrl: nameCtrl),
-          const SizedBox(height: 16),
-          const Text('Fuel Type',
-              style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            children: FuelTypes.all.map((type) {
-              final sel = fuelType == type;
-              return ChoiceChip(
-                label: Text(type),
-                selected: sel,
-                onSelected: (s) => setState(() => fuelType = type),
-                selectedColor: AppColors.blue.withValues(alpha: 0.1),
-                labelStyle: TextStyle(
-                    color: sel ? AppColors.blue : AppColors.textSecondary,
-                    fontSize: 13,
-                    fontWeight: sel ? FontWeight.w600 : FontWeight.w400),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 16),
-          Row(children: [
-            Expanded(
-                child: _Field(
-                    label: 'Capacity (L)',
-                    ctrl: capacityCtrl,
-                    keyboard: const TextInputType.numberWithOptions(
-                        decimal: true))),
-            const SizedBox(width: 12),
-            Expanded(
-                child: _Field(
-                    label: 'Low Threshold (L)',
-                    ctrl: thresholdCtrl,
-                    keyboard: const TextInputType.numberWithOptions(
-                        decimal: true))),
-          ]),
-          const SizedBox(height: 16),
-          SwitchListTile(
-            title: const Text('Active',
-                style: TextStyle(color: AppColors.textPrimary, fontSize: 14)),
-            subtitle: const Text('Visible in shifts and inventory',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
-            value: active,
-            onChanged: (v) => setState(() => active = v),
-            contentPadding: EdgeInsets.zero,
-            activeColor: AppColors.blue,
-          ),
-          if (err != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Text(err!,
-                  style: const TextStyle(color: AppColors.red, fontSize: 12)),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(isEdit ? Icons.edit_outlined : Icons.add_circle_outline,
+                  color: AppColors.blue, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                  child: Text(isEdit ? 'Edit Tank' : 'Add Tank',
+                      style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700))),
+              IconButton(
+                  icon: const Icon(Icons.close,
+                      size: 20, color: AppColors.textMuted),
+                  onPressed: () => Navigator.pop(context)),
+            ]),
+            const SizedBox(height: 20),
+            _Field(label: 'Tank Name (e.g. Tank 1)', ctrl: nameCtrl),
+            const SizedBox(height: 16),
+            const Text('Fuel Type',
+                style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: FuelTypes.all.map((type) {
+                final sel = fuelType == type;
+                return ChoiceChip(
+                  label: Text(type),
+                  selected: sel,
+                  onSelected: (s) => setState(() => fuelType = type),
+                  selectedColor: AppColors.blue.withValues(alpha: 0.1),
+                  labelStyle: TextStyle(
+                      color: sel ? AppColors.blue : AppColors.textSecondary,
+                      fontSize: 13,
+                      fontWeight: sel ? FontWeight.w600 : FontWeight.w400),
+                );
+              }).toList(),
             ),
-          const SizedBox(height: 24),
-          AppButton(
-            label: isEdit ? 'Update Tank' : 'Create Tank',
-            loading: submitting,
-            onTap: _submit,
-          ),
-        ],
+            const SizedBox(height: 16),
+            Row(children: [
+              Expanded(
+                  child: _Field(
+                      label: 'Capacity (L)',
+                      ctrl: capacityCtrl,
+                      keyboard: const TextInputType.numberWithOptions(
+                          decimal: true))),
+              const SizedBox(width: 12),
+              Expanded(
+                  child: _Field(
+                      label: 'Low Threshold (L)',
+                      ctrl: thresholdCtrl,
+                      keyboard: const TextInputType.numberWithOptions(
+                          decimal: true))),
+            ]),
+            const SizedBox(height: 16),
+            SwitchListTile(
+              title: const Text('Active',
+                  style: TextStyle(color: AppColors.textPrimary, fontSize: 14)),
+              subtitle: const Text('Visible in shifts and inventory',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+              value: active,
+              onChanged: (v) => setState(() => active = v),
+              contentPadding: EdgeInsets.zero,
+              activeColor: AppColors.blue,
+            ),
+            if (err != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: Text(err!,
+                    style: const TextStyle(color: AppColors.red, fontSize: 12)),
+              ),
+            const SizedBox(height: 24),
+            AppButton(
+              label: isEdit ? 'Update Tank' : 'Create Tank',
+              loading: submitting,
+              onTap: _submit,
+              width: double.infinity,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -856,82 +859,85 @@ class _PumpFormSheetState extends ConsumerState<PumpFormSheet> {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Container(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 24),
       decoration: const BoxDecoration(
         color: AppColors.bgSurface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Icon(isEdit ? Icons.edit_outlined : Icons.add_circle_outline,
-                color: AppColors.blue, size: 22),
-            const SizedBox(width: 10),
-            Expanded(
-                child: Text(isEdit ? 'Edit Pump' : 'Add Pump',
-                    style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700))),
-            IconButton(
-                icon: const Icon(Icons.close,
-                    size: 20, color: AppColors.textMuted),
-                onPressed: () => Navigator.pop(context)),
-          ]),
-          const SizedBox(height: 20),
-          _Field(label: 'Pump Name (e.g. Pump 1)', ctrl: nameCtrl),
-          const SizedBox(height: 16),
-          const Text('Provider Type',
-              style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            value: providerType,
-            items: _providers
-                .map((p) => DropdownMenuItem(
-                    value: p,
-                    child: Text(p,
-                        style: const TextStyle(
-                            fontSize: 14, color: AppColors.textPrimary))))
-                .toList(),
-            onChanged: (v) => setState(() => providerType = v!),
-            decoration: InputDecoration(
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-              filled: true,
-              fillColor: AppColors.bgSurface,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(isEdit ? Icons.edit_outlined : Icons.add_circle_outline,
+                  color: AppColors.blue, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                  child: Text(isEdit ? 'Edit Pump' : 'Add Pump',
+                      style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700))),
+              IconButton(
+                  icon: const Icon(Icons.close,
+                      size: 20, color: AppColors.textMuted),
+                  onPressed: () => Navigator.pop(context)),
+            ]),
+            const SizedBox(height: 20),
+            _Field(label: 'Pump Name (e.g. Pump 1)', ctrl: nameCtrl),
+            const SizedBox(height: 16),
+            const Text('Provider Type',
+                style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: providerType,
+              items: _providers
+                  .map((p) => DropdownMenuItem(
+                      value: p,
+                      child: Text(p,
+                          style: const TextStyle(
+                              fontSize: 14, color: AppColors.textPrimary))))
+                  .toList(),
+              onChanged: (v) => setState(() => providerType = v!),
+              decoration: InputDecoration(
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                filled: true,
+                fillColor: AppColors.bgSurface,
+              ),
+              dropdownColor: AppColors.bgCard,
             ),
-            dropdownColor: AppColors.bgCard,
-          ),
-          const SizedBox(height: 16),
-          SwitchListTile(
-            title: const Text('Active',
-                style: TextStyle(color: AppColors.textPrimary, fontSize: 14)),
-            subtitle: const Text('Visible in shifts',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
-            value: active,
-            onChanged: (v) => setState(() => active = v),
-            contentPadding: EdgeInsets.zero,
-            activeColor: AppColors.blue,
-          ),
-          if (err != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Text(err!,
-                  style: const TextStyle(color: AppColors.red, fontSize: 12)),
+            const SizedBox(height: 16),
+            SwitchListTile(
+              title: const Text('Active',
+                  style: TextStyle(color: AppColors.textPrimary, fontSize: 14)),
+              subtitle: const Text('Visible in shifts',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+              value: active,
+              onChanged: (v) => setState(() => active = v),
+              contentPadding: EdgeInsets.zero,
+              activeColor: AppColors.blue,
             ),
-          const SizedBox(height: 24),
-          AppButton(
-            label: isEdit ? 'Update Pump' : 'Create Pump',
-            loading: submitting,
-            onTap: _submit,
-          ),
-        ],
+            if (err != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: Text(err!,
+                    style: const TextStyle(color: AppColors.red, fontSize: 12)),
+              ),
+            const SizedBox(height: 24),
+            AppButton(
+              label: isEdit ? 'Update Pump' : 'Create Pump',
+              loading: submitting,
+              onTap: _submit,
+              width: double.infinity,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1055,127 +1061,130 @@ class _NozzleFormSheetState extends ConsumerState<NozzleFormSheet> {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Container(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 24),
       decoration: const BoxDecoration(
         color: AppColors.bgSurface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Icon(isEdit ? Icons.edit_outlined : Icons.add_circle_outline,
-                color: AppColors.blue, size: 22),
-            const SizedBox(width: 10),
-            Expanded(
-                child: Text(isEdit ? 'Edit Nozzle' : 'Add Nozzle',
-                    style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700))),
-            IconButton(
-                icon: const Icon(Icons.close,
-                    size: 20, color: AppColors.textMuted),
-                onPressed: () => Navigator.pop(context)),
-          ]),
-          const SizedBox(height: 20),
-          _Field(label: 'Nozzle Label (e.g. N1)', ctrl: labelCtrl),
-          const SizedBox(height: 16),
-          const Text('Fuel Type',
-              style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            children: FuelTypes.all.map((type) {
-              final sel = fuelType == type;
-              return ChoiceChip(
-                label: Text(type),
-                selected: sel,
-                onSelected: (s) => setState(() => fuelType = type),
-                selectedColor: AppColors.blue.withValues(alpha: 0.1),
-                labelStyle: TextStyle(
-                    color: sel ? AppColors.blue : AppColors.textSecondary,
-                    fontSize: 13,
-                    fontWeight: sel ? FontWeight.w600 : FontWeight.w400),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 16),
-          if (_loadingTanks)
-            const LinearProgressIndicator()
-          else if (_tanks.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                  color: AppColors.amber.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8)),
-              child: const Row(children: [
-                Icon(Icons.warning_amber, color: AppColors.amber, size: 16),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text('No active tanks found. Please add a tank first.',
-                      style: TextStyle(color: AppColors.amber, fontSize: 12)),
-                ),
-              ]),
-            )
-          else ...[
-            const Text('Source Tank',
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(isEdit ? Icons.edit_outlined : Icons.add_circle_outline,
+                  color: AppColors.blue, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                  child: Text(isEdit ? 'Edit Nozzle' : 'Add Nozzle',
+                      style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700))),
+              IconButton(
+                  icon: const Icon(Icons.close,
+                      size: 20, color: AppColors.textMuted),
+                  onPressed: () => Navigator.pop(context)),
+            ]),
+            const SizedBox(height: 20),
+            _Field(label: 'Nozzle Label (e.g. N1)', ctrl: labelCtrl),
+            const SizedBox(height: 16),
+            const Text('Fuel Type',
                 style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 12,
                     fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: tankId,
-              items: _tanks
-                  .map((t) => DropdownMenuItem(
-                      value: t['id'] as String,
-                      child: Text(t['name'] as String,
-                          style: const TextStyle(
-                              fontSize: 14, color: AppColors.textPrimary))))
-                  .toList(),
-              onChanged: (v) => setState(() => tankId = v!),
-              decoration: InputDecoration(
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                filled: true,
-                fillColor: AppColors.bgSurface,
+            Wrap(
+              spacing: 8,
+              children: FuelTypes.all.map((type) {
+                final sel = fuelType == type;
+                return ChoiceChip(
+                  label: Text(type),
+                  selected: sel,
+                  onSelected: (s) => setState(() => fuelType = type),
+                  selectedColor: AppColors.blue.withValues(alpha: 0.1),
+                  labelStyle: TextStyle(
+                      color: sel ? AppColors.blue : AppColors.textSecondary,
+                      fontSize: 13,
+                      fontWeight: sel ? FontWeight.w600 : FontWeight.w400),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 16),
+            if (_loadingTanks)
+              const LinearProgressIndicator()
+            else if (_tanks.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                    color: AppColors.amber.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8)),
+                child: const Row(children: [
+                  Icon(Icons.warning_amber, color: AppColors.amber, size: 16),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text('No active tanks found. Please add a tank first.',
+                        style: TextStyle(color: AppColors.amber, fontSize: 12)),
+                  ),
+                ]),
+              )
+            else ...[
+              const Text('Source Tank',
+                  style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: tankId,
+                items: _tanks
+                    .map((t) => DropdownMenuItem(
+                        value: t['id'] as String,
+                        child: Text(t['name'] as String,
+                            style: const TextStyle(
+                                fontSize: 14, color: AppColors.textPrimary))))
+                    .toList(),
+                onChanged: (v) => setState(() => tankId = v!),
+                decoration: InputDecoration(
+                  border:
+                      OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                  filled: true,
+                  fillColor: AppColors.bgSurface,
+                ),
+                dropdownColor: AppColors.bgCard,
               ),
-              dropdownColor: AppColors.bgCard,
+            ],
+            const SizedBox(height: 16),
+            _Field(
+                label: 'Default Testing (L)',
+                ctrl: testingCtrl,
+                keyboard: const TextInputType.numberWithOptions(decimal: true)),
+            const SizedBox(height: 16),
+            SwitchListTile(
+              title: const Text('Active',
+                  style: TextStyle(color: AppColors.textPrimary, fontSize: 14)),
+              value: active,
+              onChanged: (v) => setState(() => active = v),
+              contentPadding: EdgeInsets.zero,
+              activeColor: AppColors.blue,
+            ),
+            if (err != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: Text(err!,
+                    style: const TextStyle(color: AppColors.red, fontSize: 12)),
+              ),
+            const SizedBox(height: 24),
+            AppButton(
+              label: isEdit ? 'Update Nozzle' : 'Create Nozzle',
+              loading: submitting,
+              onTap: (_tanks.isEmpty || submitting) ? null : _submit,
+              width: double.infinity,
             ),
           ],
-          const SizedBox(height: 16),
-          _Field(
-              label: 'Default Testing (L)',
-              ctrl: testingCtrl,
-              keyboard: const TextInputType.numberWithOptions(decimal: true)),
-          const SizedBox(height: 16),
-          SwitchListTile(
-            title: const Text('Active',
-                style: TextStyle(color: AppColors.textPrimary, fontSize: 14)),
-            value: active,
-            onChanged: (v) => setState(() => active = v),
-            contentPadding: EdgeInsets.zero,
-            activeColor: AppColors.blue,
-          ),
-          if (err != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Text(err!,
-                  style: const TextStyle(color: AppColors.red, fontSize: 12)),
-            ),
-          const SizedBox(height: 24),
-          AppButton(
-            label: isEdit ? 'Update Nozzle' : 'Create Nozzle',
-            loading: submitting,
-            onTap: (_tanks.isEmpty || submitting) ? null : _submit,
-          ),
-        ],
+        ),
       ),
     );
   }

@@ -141,21 +141,38 @@ class AuthService {
 
   /// Restore session on app launch
   Future<AuthUser?> restoreSession() async {
-    // Try to restore tenant connection
-    final stationCode = await TenantService.instance.restoreFromStorage();
-    if (stationCode == null) return null;
+    // Stage 1: Check if tenant is already configured
+    if (!TenantService.instance.isConfigured) {
+      debugPrint('AUTH_RESTORE: Bailing out - no technical tenant configured.');
+      return null;
+    }
 
-    // Restore user from secure storage
+    // Stage 2: Try to restore user from secure storage
     final userJson =
         await _storage.read(key: '${StorageKeys.userSession}_user');
-    if (userJson == null) return null;
+    if (userJson == null) {
+      debugPrint('AUTH_RESTORE: No persisted user session found.');
+      return null;
+    }
 
     final user = AuthUser.fromJsonString(userJson);
-    if (user == null) return null;
+    if (user == null) {
+      debugPrint('AUTH_RESTORE: Failed to decode persisted user JSON.');
+      return null;
+    }
 
-    // Try to restore Supabase session
-    await TenantService.instance.restoreSession();
+    // Stage 3: Try to restore Supabase auth session (TECHNICAL SYNC)
+    debugPrint('AUTH_RESTORE: Found persisted user ${user.fullName}. Syncing Supabase...');
+    final syncOk = await TenantService.instance.restoreSession();
 
+    if (!syncOk) {
+      debugPrint('AUTH_RESTORE: Technical sync failed (Expired or Invalid). Bailing out.');
+      // Important: We do NOT clear _currentUser here because we want to 
+      // let the caller decide (AuthNotifier will handle clearing state).
+      return null;
+    }
+
+    debugPrint('AUTH_RESTORE: Technical sync successful.');
     _currentUser = user;
     return user;
   }

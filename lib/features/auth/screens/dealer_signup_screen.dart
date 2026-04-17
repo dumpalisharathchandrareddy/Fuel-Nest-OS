@@ -5,6 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../shared/widgets/widgets.dart';
+import '../../../core/utils/validators.dart';
+import '../../../core/constants/app_constants.dart';
+import 'package:flutter/services.dart';
 
 class DealerSignupScreen extends ConsumerStatefulWidget {
   const DealerSignupScreen({super.key});
@@ -28,7 +31,7 @@ class _DealerSignupScreenState extends ConsumerState<DealerSignupScreen> {
   final _codeCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
   final _cityCtrl = TextEditingController();
-  final _stateCtrl = TextEditingController();
+  String? _selectedState;
 
   // Owner info
   final _ownerNameCtrl = TextEditingController();
@@ -53,7 +56,6 @@ class _DealerSignupScreenState extends ConsumerState<DealerSignupScreen> {
       _codeCtrl,
       _nameCtrl,
       _cityCtrl,
-      _stateCtrl,
       _ownerNameCtrl,
       _phoneCtrl,
       _passwordCtrl,
@@ -109,7 +111,7 @@ class _DealerSignupScreenState extends ConsumerState<DealerSignupScreen> {
           anonKey: _anonKeyCtrl.text.trim(),
           dbMode: _dbMode ?? 'byo',
           city: _cityCtrl.text.trim(),
-          state: _stateCtrl.text.trim(),
+          state: _selectedState ?? '',
         );
     if (!ok && mounted) {
       setState(() {
@@ -134,12 +136,13 @@ class _DealerSignupScreenState extends ConsumerState<DealerSignupScreen> {
           onPressed: () => context.go('/station'),
         ),
       ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(
-            horizontal: isWide ? size.width * 0.25 : 24,
-            vertical: 24,
-          ),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(
+              horizontal: isWide ? size.width * 0.25 : 24,
+              vertical: 24,
+            ),
           child: Form(
             key: _form,
             child: ValueListenableBuilder(
@@ -198,35 +201,51 @@ class _DealerSignupScreenState extends ConsumerState<DealerSignupScreen> {
                     ],
 
                     const SizedBox(height: 24),
-                    Row(
-                      children: [
-                        if (step > 0) ...[
-                          Expanded(
-                            child: AppButton(
-                              label: 'Back',
-                              secondary: true,
-                              onTap: () => _onBack(step),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                        ],
-                        Expanded(
-                          child: AppButton(
-                            label: _isLastStep ? 'Create Station' : 'Next',
-                            loading: _loading,
-                            onTap: _isLastStep
-                                ? _submit
-                                : () => _onNext(step),
-                          ),
+                    if (size.width < 360) ...[
+                      AppButton(
+                        label: _isLastStep ? 'Create Station' : 'Next',
+                        loading: _loading,
+                        onTap: _isLastStep ? _submit : () => _onNext(step),
+                        width: double.infinity,
+                      ),
+                      if (step > 0) ...[
+                        const SizedBox(height: 12),
+                        AppButton(
+                          label: 'Back',
+                          secondary: true,
+                          onTap: () => _onBack(step),
+                          width: double.infinity,
                         ),
                       ],
-                    ),
+                    ] else
+                      Row(
+                        children: [
+                          if (step > 0) ...[
+                            Expanded(
+                              child: AppButton(
+                                label: 'Back',
+                                secondary: true,
+                                onTap: () => _onBack(step),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                          ],
+                          Expanded(
+                            child: AppButton(
+                              label: _isLastStep ? 'Create Station' : 'Next',
+                              loading: _loading,
+                              onTap: _isLastStep ? _submit : () => _onNext(step),
+                            ),
+                          ),
+                        ],
+                      ),
                   ],
                 );
               },
             ),
           ),
         ),
+      ),
       ),
     );
   }
@@ -306,13 +325,7 @@ class _DealerSignupScreenState extends ConsumerState<DealerSignupScreen> {
           controller: _urlCtrl,
           prefixIcon: Icons.link,
           keyboardType: TextInputType.url,
-          validator: (v) {
-            if (v == null || v.trim().isEmpty) return 'Required';
-            if (!v.trim().contains('supabase.co')) {
-              return 'Enter a valid Supabase URL';
-            }
-            return null;
-          },
+          validator: Validators.supabaseUrl,
         ),
         const SizedBox(height: 16),
         AppTextField(
@@ -320,8 +333,7 @@ class _DealerSignupScreenState extends ConsumerState<DealerSignupScreen> {
           hint: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
           controller: _anonKeyCtrl,
           prefixIcon: Icons.vpn_key_outlined,
-          validator: (v) =>
-              v == null || v.trim().isEmpty ? 'Required' : null,
+          validator: (v) => Validators.required(v, 'Anon Key'),
           maxLines: 3,
         ),
         const SizedBox(height: 12),
@@ -355,12 +367,10 @@ class _DealerSignupScreenState extends ConsumerState<DealerSignupScreen> {
           controller: _codeCtrl,
           prefixIcon: Icons.qr_code,
           textCapitalization: TextCapitalization.characters,
-          validator: (v) {
-            if (v == null || v.trim().isEmpty) return 'Required';
-            if (v.trim().length < 4) return 'At least 4 characters';
-            if (v.trim().contains(' ')) return 'No spaces allowed';
-            return null;
-          },
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
+          ],
+          validator: Validators.stationCode,
         ),
         const SizedBox(height: 12),
         const Text(
@@ -374,29 +384,76 @@ class _DealerSignupScreenState extends ConsumerState<DealerSignupScreen> {
           controller: _nameCtrl,
           prefixIcon: Icons.store_outlined,
           textCapitalization: TextCapitalization.words,
-          validator: (v) =>
-              v == null || v.trim().isEmpty ? 'Required' : null,
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+          ],
+          validator: (v) => Validators.name(v, 'Station Name'),
         ),
         const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: AppTextField(
-                label: 'City',
-                controller: _cityCtrl,
-                textCapitalization: TextCapitalization.words,
-              ),
+        if (MediaQuery.sizeOf(context).width < 400) ...[
+          AppTextField(
+            label: 'City',
+            controller: _cityCtrl,
+            textCapitalization: TextCapitalization.words,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+            ],
+            validator: Validators.city,
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            value: _selectedState,
+            decoration: const InputDecoration(
+              labelText: 'State',
+              prefixIcon: Icon(Icons.map_outlined, size: 18),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: AppTextField(
-                label: 'State',
-                controller: _stateCtrl,
-                textCapitalization: TextCapitalization.words,
-              ),
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 14,
             ),
-          ],
-        ),
+            dropdownColor: AppColors.bgCard,
+            items: AppConstants.indianStates.map((s) {
+              return DropdownMenuItem(value: s, child: Text(s));
+            }).toList(),
+            onChanged: (v) => setState(() => _selectedState = v),
+            validator: (v) => v == null ? 'Required' : null,
+          ),
+        ] else
+          Row(
+            children: [
+              Expanded(
+                child: AppTextField(
+                  label: 'City',
+                  controller: _cityCtrl,
+                  textCapitalization: TextCapitalization.words,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                  ],
+                  validator: Validators.city,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _selectedState,
+                  decoration: const InputDecoration(
+                    labelText: 'State',
+                    prefixIcon: Icon(Icons.map_outlined, size: 18),
+                  ),
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                  ),
+                  dropdownColor: AppColors.bgCard,
+                  items: AppConstants.indianStates.map((s) {
+                    return DropdownMenuItem(value: s, child: Text(s));
+                  }).toList(),
+                  onChanged: (v) => setState(() => _selectedState = v),
+                  validator: (v) => v == null ? 'Required' : null,
+                ),
+              ),
+            ],
+          ),
       ];
 
   List<Widget> _buildStepOwner() => [
@@ -414,8 +471,10 @@ class _DealerSignupScreenState extends ConsumerState<DealerSignupScreen> {
           controller: _ownerNameCtrl,
           prefixIcon: Icons.person_outline,
           textCapitalization: TextCapitalization.words,
-          validator: (v) =>
-              v == null || v.trim().isEmpty ? 'Required' : null,
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+          ],
+          validator: (v) => Validators.name(v, 'Full Name'),
         ),
         const SizedBox(height: 16),
         AppTextField(
@@ -423,11 +482,11 @@ class _DealerSignupScreenState extends ConsumerState<DealerSignupScreen> {
           controller: _phoneCtrl,
           prefixIcon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
-          validator: (v) {
-            if (v == null || v.trim().isEmpty) return 'Required';
-            if (v.trim().length < 10) return 'Enter valid mobile number';
-            return null;
-          },
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(10),
+          ],
+          validator: Validators.phone,
         ),
         const SizedBox(height: 16),
         AppTextField(
@@ -435,11 +494,7 @@ class _DealerSignupScreenState extends ConsumerState<DealerSignupScreen> {
           controller: _passwordCtrl,
           obscure: true,
           prefixIcon: Icons.lock_outline,
-          validator: (v) {
-            if (v == null || v.isEmpty) return 'Required';
-            if (v.length < 6) return 'Minimum 6 characters';
-            return null;
-          },
+          validator: Validators.password,
         ),
         const SizedBox(height: 16),
         AppTextField(
@@ -447,10 +502,7 @@ class _DealerSignupScreenState extends ConsumerState<DealerSignupScreen> {
           controller: _confirmPassCtrl,
           obscure: true,
           prefixIcon: Icons.lock_outline,
-          validator: (v) {
-            if (v != _passwordCtrl.text) return 'Passwords do not match';
-            return null;
-          },
+          validator: (v) => Validators.confirmPassword(v, _passwordCtrl.text),
         ),
       ];
 }
@@ -511,12 +563,16 @@ class _DbModeCard extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
+                      Expanded(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),

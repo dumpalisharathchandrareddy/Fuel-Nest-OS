@@ -9,8 +9,8 @@ class Validators {
 
   static String? phone(String? v) {
     if (v == null || v.trim().isEmpty) return 'Phone number is required';
-    final digits = v.replaceAll(RegExp(r'\D'), '');
-    if (digits.length < 10) return 'Enter a valid 10-digit mobile number';
+    final digits = v.trim().replaceAll(RegExp(r'\D'), '');
+    if (digits.length != 10) return 'Must be exactly 10 digits';
     return null;
   }
 
@@ -38,8 +38,18 @@ class Validators {
 
   static String? stationCode(String? v) {
     if (v == null || v.trim().isEmpty) return 'Station code is required';
-    if (v.trim().length < 4) return 'At least 4 characters';
-    if (v.trim().contains(' ')) return 'No spaces allowed';
+    final code = v.trim().toUpperCase();
+    if (code.contains(' ')) return 'No spaces allowed';
+    if (!RegExp(r'^[A-Z0-9]+$').hasMatch(code)) {
+      return 'Only letters and numbers allowed';
+    }
+    // At least 3 letters
+    final letters = code.replaceAll(RegExp(r'[^A-Z]'), '');
+    if (letters.length < 3) return 'Must contain at least 3 letters';
+    // At least 1 number
+    final numbers = code.replaceAll(RegExp(r'[^0-9]'), '');
+    if (numbers.isEmpty) return 'Must contain at least 1 number';
+
     return null;
   }
 
@@ -68,6 +78,40 @@ class Validators {
     if (!RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(v.trim())) {
       return 'Enter a valid email address';
     }
+    return null;
+  }
+
+  static String? name(String? v, [String field = 'Name']) {
+    if (v == null || v.trim().isEmpty) return '$field is required';
+    final val = v.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (val.length < 2) return '$field too short (min 2)';
+    if (val.length > 60) return '$field too long (max 60)';
+    if (!RegExp(r'^[a-zA-Z\s]+$').hasMatch(val)) {
+      return 'Only letters and spaces allowed';
+    }
+    return null;
+  }
+
+  static String? city(String? v) {
+    if (v == null || v.trim().isEmpty) return 'City is required';
+    final val = v.trim();
+    if (!RegExp(r'^[a-zA-Z\s]+$').hasMatch(val)) {
+      return 'Only letters and spaces allowed';
+    }
+    return null;
+  }
+
+  static String? state(String? v) {
+    if (v == null || v.trim().isEmpty) return 'State is required';
+    final val = v.trim();
+    if (!RegExp(r'^[a-zA-Z\s]+$').hasMatch(val)) {
+      return 'Only letters and spaces allowed';
+    }
+    return null;
+  }
+
+  static String? confirmPassword(String? v, String original) {
+    if (v != original) return 'Passwords do not match';
     return null;
   }
 

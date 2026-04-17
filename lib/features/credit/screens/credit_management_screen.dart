@@ -728,7 +728,7 @@ class _CreditEntrySheetState extends ConsumerState<CreditEntrySheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
           20, 20, 20, MediaQuery.viewInsetsOf(context).bottom + 24),
       child: Column(
@@ -961,7 +961,7 @@ class _CreditPaymentSheetState extends ConsumerState<CreditPaymentSheet> {
   @override
   Widget build(BuildContext context) {
     final outstanding = widget.customer['outstanding'] as double? ?? 0;
-    return Padding(
+    return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
           20, 20, 20, MediaQuery.viewInsetsOf(context).bottom + 24),
       child: Column(
@@ -1153,7 +1153,7 @@ class _CustomerFormSheetState extends ConsumerState<CustomerFormSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
           20, 20, 20, MediaQuery.viewInsetsOf(context).bottom + 24),
       child: Column(

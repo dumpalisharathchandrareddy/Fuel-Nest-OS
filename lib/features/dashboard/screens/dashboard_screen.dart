@@ -288,11 +288,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           SliverPadding(
             padding: const EdgeInsets.all(20),
             sliver: SliverGrid(
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: MediaQuery.sizeOf(context).width > 600 ? 4 : 2,
+              gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 220,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                childAspectRatio: MediaQuery.sizeOf(context).width < 380 ? 1.1 : 1.35,
+                mainAxisExtent: 100, // Fixed height for KPI cards to keep grid consistent
               ),
               delegate: SliverChildListDelegate([
                 KpiCard.currency(

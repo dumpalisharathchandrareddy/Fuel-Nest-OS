@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/app_constants.dart';
@@ -35,22 +36,10 @@ class TenantService {
   /// Called after station code lookup succeeds.
   Future<void> configure(StationRegistryEntry entry) async {
     // Store securely for next app launch
-    await _storage.write(
-      key: StorageKeys.tenantUrl,
-      value: entry.supabaseUrl,
-    );
-    await _storage.write(
-      key: StorageKeys.tenantAnonKey,
-      value: entry.anonKey,
-    );
-    await _storage.write(
-      key: StorageKeys.stationCode,
-      value: entry.stationCode,
-    );
-    await _storage.write(
-      key: StorageKeys.stationName,
-      value: entry.stationName,
-    );
+    await _storage.write(key: StorageKeys.tenantUrl, value: entry.supabaseUrl);
+    await _storage.write(key: StorageKeys.tenantAnonKey, value: entry.anonKey);
+    await _storage.write(key: StorageKeys.stationCode, value: entry.stationCode);
+    await _storage.write(key: StorageKeys.stationName, value: entry.stationName);
 
     _currentStation = entry;
     _tenantClient = SupabaseClient(entry.supabaseUrl, entry.anonKey);
@@ -78,7 +67,15 @@ class TenantService {
     final stationCode = await _storage.read(key: StorageKeys.stationCode);
     final stationName = await _storage.read(key: StorageKeys.stationName);
 
-    if (url == null || anonKey == null || stationCode == null) return null;
+    debugPrint('TENANT_RESTORE: url=${url != null}, key=${anonKey != null}, code=$stationCode');
+
+    if (url == null || anonKey == null || stationCode == null) {
+      if (url != null || anonKey != null || stationCode != null) {
+        debugPrint('TENANT_RESTORE: Partial config found; triggering full reset for safety.');
+        await fullReset();
+      }
+      return null;
+    }
 
     _tenantClient = SupabaseClient(url, anonKey);
     _currentStation = StationRegistryEntry(
@@ -88,6 +85,7 @@ class TenantService {
       anonKey: anonKey,
     );
 
+    debugPrint('TENANT_RESTORE: Successfully re-initialized station $stationCode');
     return stationCode;
   }
 
@@ -111,11 +109,20 @@ class TenantService {
   /// Restore the saved session on app resume.
   Future<bool> restoreSession() async {
     final saved = await _storage.read(key: StorageKeys.userSession);
-    if (saved == null) return false;
+    if (saved == null) {
+      debugPrint('TENANT_RESTORE: No session token found in storage.');
+      return false;
+    }
     try {
-      await client.auth.setSession(saved).timeout(const Duration(seconds: 8));
-      return true;
-    } catch (_) {
+      final response = await client.auth
+          .setSession(saved)
+          .timeout(const Duration(seconds: 10));
+      
+      final hasSession = response.session != null;
+      debugPrint('TENANT_RESTORE: Supabase setSession completed. hasSession=$hasSession');
+      return hasSession;
+    } catch (e) {
+      debugPrint('TENANT_RESTORE: setSession failed error=$e');
       return false;
     }
   }
@@ -132,8 +139,11 @@ class TenantService {
 
   /// Full reset - clear everything including station code.
   Future<void> fullReset() async {
+    debugPrint('TENANT_RESET: Performing full cleanup of station and session data.');
     await clearTenant();
     await _storage.deleteAll();
+    _tenantClient = null;
+    _currentStation = null;
   }
 
   /// Returns a temporary SupabaseClient for [entry] without writing to secure

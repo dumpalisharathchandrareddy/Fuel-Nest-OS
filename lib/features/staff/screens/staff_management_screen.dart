@@ -7,6 +7,7 @@ import '../../../core/services/tenant_service.dart';
 import '../../../core/services/discord_service.dart';
 import '../../../core/utils/currency.dart';
 import '../../../shared/widgets/widgets.dart';
+import '../../../core/utils/validators.dart';
 import 'package:uuid/uuid.dart';
 
 class StaffManagementScreen extends ConsumerStatefulWidget {
@@ -705,6 +706,7 @@ class _StaffFormSheetState extends ConsumerState<StaffFormSheet> {
 
   bool submitting = false;
   String? err;
+  final _formKey = GlobalKey<FormState>();
 
   @override
   void initState() {
@@ -759,7 +761,9 @@ class _StaffFormSheetState extends ConsumerState<StaffFormSheet> {
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
           20, 20, 20, MediaQuery.viewInsetsOf(context).bottom + 24),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      child: Form(
+        key: _formKey,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Icon(isEdit ? Icons.edit_outlined : Icons.person_add_alt,
               color: AppColors.blue, size: 22),
@@ -822,37 +826,53 @@ class _StaffFormSheetState extends ConsumerState<StaffFormSheet> {
         }).toList()),
         const SizedBox(height: 16),
 
-        _Field(
-            label: 'Full Name *',
-            ctrl: nameCtrl,
-            capitalize: TextCapitalization.words,
-            onChanged: (_) => setState(onNameOrIdChanged)),
+        AppTextField(
+          label: 'Full Name *',
+          controller: nameCtrl,
+          textCapitalization: TextCapitalization.words,
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+          ],
+          onChanged: (_) => setState(onNameOrIdChanged),
+          validator: (v) => Validators.name(v, 'Full Name'),
+        ),
         const SizedBox(height: 12),
-        _Field(
-            label: 'Mobile Number *',
-            ctrl: phoneCtrl,
-            keyboard: TextInputType.phone),
+        AppTextField(
+          label: 'Mobile Number *',
+          controller: phoneCtrl,
+          keyboardType: TextInputType.phone,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(10),
+          ],
+          validator: Validators.phone,
+        ),
         const SizedBox(height: 12),
         Row(children: [
           Expanded(
-              child: _Field(
-                  label: 'Employee ID',
-                  ctrl: empIdCtrl,
-                  capitalize: TextCapitalization.characters,
-                  onChanged: (_) => setState(onNameOrIdChanged))),
+            child: AppTextField(
+              label: 'Employee ID',
+              controller: empIdCtrl,
+              textCapitalization: TextCapitalization.characters,
+              onChanged: (_) => setState(onNameOrIdChanged),
+            ),
+          ),
           const SizedBox(width: 8),
-          Expanded(child: _Field(label: 'Username', ctrl: usernameCtrl)),
+          Expanded(child: AppTextField(label: 'Username', controller: usernameCtrl)),
         ]),
         const SizedBox(height: 12),
-        _Field(
-            label: 'Base Salary (₹/month)',
-            ctrl: salaryCtrl,
-            keyboard: const TextInputType.numberWithOptions(decimal: true)),
+        AppTextField(
+          label: 'Base Salary (₹/month)',
+          controller: salaryCtrl,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        ),
         const SizedBox(height: 12),
-        _Field(
-            label: isEdit ? 'New Password (leave blank to keep)' : 'Password *',
-            ctrl: passCtrl,
-            obscure: true),
+        AppTextField(
+          label: isEdit ? 'New Password (leave blank to keep)' : 'Password *',
+          controller: passCtrl,
+          obscure: true,
+          validator: isEdit ? null : Validators.password,
+        ),
         const SizedBox(height: 4),
         const Text(
             'Staff can also login with PIN — set it separately after creation',
@@ -874,14 +894,7 @@ class _StaffFormSheetState extends ConsumerState<StaffFormSheet> {
           loading: submitting,
           width: double.infinity,
           onTap: () async {
-            if (nameCtrl.text.trim().isEmpty || phoneCtrl.text.trim().isEmpty) {
-              setState(() => err = 'Name and phone number are required');
-              return;
-            }
-            if (!isEdit && passCtrl.text.isEmpty) {
-              setState(() => err = 'Password is required for new staff');
-              return;
-            }
+            if (!_formKey.currentState!.validate()) return;
             setState(() {
               submitting = true;
               err = null;
@@ -984,7 +997,8 @@ class _StaffFormSheetState extends ConsumerState<StaffFormSheet> {
             }
           },
         ),
-      ]),
+        ]),
+      ),
     );
   }
 }

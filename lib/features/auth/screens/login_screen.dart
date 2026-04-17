@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../shared/widgets/widgets.dart';
+import '../../../core/utils/validators.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -94,17 +96,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 32),
 
                   // App Logo/Icon
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: AppColors.blueBg,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(Icons.login_rounded,
-                        color: AppColors.blue, size: 26),
-                  ),
                   const SizedBox(height: 24),
+                  
+                  // App Logo/Icon
+                  Builder(builder: (context) {
+                    final h = MediaQuery.sizeOf(context).height;
+                    final logoSize = h < 700 ? 44.0 : 52.0;
+                    return Container(
+                      width: logoSize,
+                      height: logoSize,
+                      decoration: BoxDecoration(
+                        color: AppColors.blueBg,
+                        borderRadius: BorderRadius.circular(logoSize * 0.26),
+                      ),
+                      child: Icon(Icons.login_rounded,
+                          color: AppColors.blue, size: logoSize * 0.5),
+                    );
+                  }),
+                  const SizedBox(height: 16),
 
                   const Text(
                     'Sign In',
@@ -120,7 +129,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     style: const TextStyle(
                         color: AppColors.textSecondary, fontSize: 15),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
 
                   // Role selector
                   const Text(
@@ -133,6 +142,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
+                    runSpacing: 0,
                     children: _roles.map((r) {
                       final selected = _role == r.$1;
                       return ChoiceChip(
@@ -159,7 +169,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       );
                     }).toList(),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
 
                   // Phone number
                   AppTextField(
@@ -169,11 +179,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     prefixIcon: Icons.phone_android_outlined,
                     keyboardType: TextInputType.phone,
                     textInputAction: TextInputAction.next,
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Required';
-                      if (v.trim().length < 10) return 'Enter valid phone';
-                      return null;
-                    },
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(10),
+                    ],
+                    validator: Validators.phone,
                   ),
                   const SizedBox(height: 20),
 
@@ -213,8 +223,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         _usePin ? Icons.pin_outlined : Icons.lock_outline,
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _login(),
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'Required' : null,
+                    validator: (v) => Validators.required(v, _usePin ? 'PIN' : 'Password'),
                   ),
 
                   if (auth.error != null) ...[
