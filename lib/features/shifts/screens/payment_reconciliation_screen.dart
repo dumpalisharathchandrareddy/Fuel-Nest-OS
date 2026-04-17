@@ -26,6 +26,15 @@ class _PaymentReconciliationScreenState
   String? _error;
   Map<String, dynamic>? _shift;
   Map<String, dynamic>? _paymentRecord;
+
+  Map<String, dynamic>? _getMap(dynamic data) {
+    if (data == null) return null;
+    if (data is List) {
+      if (data.isEmpty) return null;
+      return Map<String, dynamic>.from(data.first as Map);
+    }
+    return Map<String, dynamic>.from(data as Map);
+  }
   final _upiCtrl = TextEditingController(text: '0');
   final _cardCtrl = TextEditingController(text: '0');
   final _creditCtrl = TextEditingController(text: '0');
@@ -58,18 +67,28 @@ class _PaymentReconciliationScreenState
       final shift = await db
           .from('Shift')
           .select(
-              'id, status, created_at, closed_at, pump:Pump(name), assigned_worker:User(full_name), nozzle_entries:NozzleEntry(id, opening_reading, closing_reading, nozzle:Nozzle(label, fuel_type)), payment_record:PaymentRecord(id, upi_amount, card_amount, credit_amount, cash_to_collect, actual_cash_collected_amount, total_sale_amount, is_balanced)')
+              'id, status, created_at, closed_at, pump:Pump(name), assigned_worker:User(full_name), nozzle_entries:NozzleEntry(id, nozzle_id, opening_reading, closing_reading, testing_quantity, sale_litres, sale_amount, rate, nozzle:Nozzle(label, fuel_type, tank_id)), payment_record:PaymentRecord(id, upi_amount, card_amount, credit_amount, cash_to_collect, actual_cash_collected_amount, total_sale_amount, is_balanced)')
           .eq('id', widget.shiftId)
           .single();
 
+      // Fetch all credit transactions for this shift to get the real total
+      final credits = await db
+          .from('CreditTransaction')
+          .select('amount')
+          .eq('shift_id', widget.shiftId);
+      
+      final creditTotal = (credits as List).fold<double>(0, (sum, c) => sum + (double.tryParse(c['amount']?.toString() ?? '0') ?? 0));
+
       // PaymentRecord is one row per shift (not a list of per-method rows)
       // Display as single structured record with UPI/cash/card amounts
-      final pr = shift['payment_record'] as Map<String, dynamic>?;
+      final pr = _getMap(shift['payment_record']);
       if (pr != null) {
         _upiCtrl.text = pr['upi_amount']?.toString() ?? '0';
         _cardCtrl.text = pr['card_amount']?.toString() ?? '0';
-        _creditCtrl.text = pr['credit_amount']?.toString() ?? '0';
+        _creditCtrl.text = creditTotal > 0 ? creditTotal.toString() : (pr['credit_amount']?.toString() ?? '0');
         _actualCashCtrl.text = (pr['actual_cash_collected_amount'] ?? pr['cash_to_collect'] ?? 0).toString();
+      } else {
+        _creditCtrl.text = creditTotal.toString();
       }
 
       setState(() {
@@ -107,6 +126,27 @@ class _PaymentReconciliationScreenState
   double get _difference => _totalCollected - _totalSale;
 
   Future<void> _settle() async {
+    // Ensure nozzle readings are present
+    final entries = _shift?['nozzle_entries'] as List? ?? [];
+    if (entries.isEmpty || entries.any((e) => e['closing_reading'] == null)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Cannot settle shift: Nozzle readings are missing.'),
+          action: SnackBarAction(
+            label: 'Enter Readings',
+            onPressed: () {
+              final pump = _getMap(_shift!['pump']);
+              final pumpId = pump?['id'] as String? ?? '';
+              if (pumpId.isNotEmpty) {
+                context.push('/app/shifts/nozzle/$pumpId');
+              }
+            },
+          ),
+        ),
+      );
+      return;
+    }
+
     if (_difference.abs() > 1 && _noteCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please provide a note for the mismatch')),
@@ -128,6 +168,7 @@ class _PaymentReconciliationScreenState
     try {
       final db = TenantService.instance.client;
       final stationName = ref.read(stationNameProvider);
+      final user = ref.read(currentUserProvider)!;
 
       if (_paymentRecord != null) {
         await db.from('PaymentRecord').update({
@@ -144,6 +185,58 @@ class _PaymentReconciliationScreenState
         }).eq('id', _paymentRecord!['id']);
       }
 
+      // 1. PERFORM TANK STOCK VALIDATION & DEDUCTION (ONLY IF TRANSITIONING TO CLOSED)
+      if (_shift?['status'] != 'CLOSED') {
+        final entries = _shift?['nozzle_entries'] as List? ?? [];
+        
+        // Group by tank
+        final tankSales = <String, double>{};
+        for (final e in entries) {
+           final nozzle = _getMap(e['nozzle']);
+           final tid = nozzle?['tank_id'] as String?;
+           if (tid != null) {
+             final qty = double.tryParse(e['sale_litres']?.toString() ?? '0') ?? 0;
+             tankSales[tid] = (tankSales[tid] ?? 0) + qty;
+           }
+        }
+
+        // Validate stock
+        for (final tid in tankSales.keys) {
+           final needed = tankSales[tid]!;
+           if (needed <= 0) continue;
+
+           final stockData = await Future.wait<dynamic>([
+             db.from('TankInitialStock').select('opening_litres').eq('tank_id', tid).eq('station_id', user.stationId).maybeSingle(),
+             db.from('StockTransaction').select('quantity').eq('tank_id', tid).eq('station_id', user.stationId),
+           ]);
+
+           double currentStock = double.tryParse(stockData[0]?['opening_litres']?.toString() ?? '0') ?? 0;
+           for (final tx in stockData[1] as List) {
+             currentStock += double.tryParse(tx['quantity']?.toString() ?? '0') ?? 0;
+           }
+
+           if (currentStock < needed) {
+             throw 'Insufficient stock in tank. Available: ${currentStock.toStringAsFixed(2)}L, Needed: ${needed.toStringAsFixed(2)}L';
+           }
+        }
+
+        // Deduct stock (Insert StockTransaction)
+        for (final tid in tankSales.keys) {
+          final qty = tankSales[tid]!;
+          if (qty <= 0) continue;
+
+          await db.from('StockTransaction').insert({
+            'station_id': user.stationId,
+            'tank_id': tid,
+            'type': 'SALE',
+            'quantity': -qty,
+            'reference_id': widget.shiftId,
+            'created_at': DateTime.now().toUtc().toIso8601String(),
+            'created_by_id': user.id,
+          });
+        }
+      }
+
       // Close the shift
       await db.from('Shift').update({
         'status': 'CLOSED',
@@ -154,10 +247,10 @@ class _PaymentReconciliationScreenState
       // Discord alert
       await DiscordService.instance.sendShiftClosed(
         pumpName:
-            (_shift!['pump'] as Map?)?['name'] as String? ?? 'Unknown Pump',
+            (_getMap(_shift!['pump']))?['name'] as String? ?? 'Unknown Pump',
         saleAmount: _totalSale,
         workerName:
-            (_shift!['assigned_worker'] as Map?)?['full_name'] as String? ??
+            (_getMap(_shift!['assigned_worker']))?['full_name'] as String? ??
                 'Unknown',
         stationName: stationName,
       );
@@ -194,6 +287,10 @@ class _PaymentReconciliationScreenState
             'Unassigned';
     final status = _shift!['status'] as String? ?? '';
     final isSettled = status == 'CLOSED' || status == 'SETTLED';
+    
+    final user = ref.read(currentUserProvider);
+    final isDealer = user?.role == 'DEALER';
+    final canEdit = !isSettled || (isSettled && isDealer);
 
     return Scaffold(
       backgroundColor: AppColors.bgApp,
@@ -282,21 +379,21 @@ class _PaymentReconciliationScreenState
                       _PaymentInput(
                         label: 'UPI Amount',
                         controller: _upiCtrl,
-                        enabled: !isSettled,
+                        enabled: canEdit,
                         onChanged: (_) => setState(() {}),
                       ),
                       const Divider(height: 24, color: AppColors.border),
                       _PaymentInput(
                         label: 'Card Amount',
                         controller: _cardCtrl,
-                        enabled: !isSettled,
+                        enabled: canEdit,
                         onChanged: (_) => setState(() {}),
                       ),
                       const Divider(height: 24, color: AppColors.border),
                       _PaymentInput(
                         label: 'Credit Amount',
                         controller: _creditCtrl,
-                        enabled: !isSettled,
+                        enabled: canEdit,
                         onChanged: (_) => setState(() {}),
                       ),
                     ],
@@ -335,7 +432,7 @@ class _PaymentReconciliationScreenState
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _actualCashCtrl,
-                        enabled: !isSettled,
+                        enabled: canEdit,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         textAlign: TextAlign.center,
                         onChanged: (_) => setState(() {}),
@@ -396,7 +493,7 @@ class _PaymentReconciliationScreenState
                         const SizedBox(height: 8),
                         TextFormField(
                           controller: _noteCtrl,
-                          enabled: !isSettled,
+                          enabled: canEdit,
                           maxLines: 2,
                           decoration: InputDecoration(
                             hintText: 'Explain the difference (mandatory)',
@@ -413,7 +510,7 @@ class _PaymentReconciliationScreenState
               ],
             ),
           ),
-          if (!isSettled)
+          if (canEdit)
             Container(
               padding: const EdgeInsets.all(20),
               decoration: const BoxDecoration(
@@ -421,7 +518,7 @@ class _PaymentReconciliationScreenState
                 border: Border(top: BorderSide(color: AppColors.border)),
               ),
               child: AppButton(
-                label: 'Settle Shift',
+                label: isSettled ? 'Update Settlement' : 'Settle Shift',
                 onTap: _settle,
                 loading: _submitting,
                 width: double.infinity,

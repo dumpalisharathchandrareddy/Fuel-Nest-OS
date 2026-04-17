@@ -355,7 +355,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             child: _ActiveShiftCard(
                               shift: s,
                               onTap: () {
-                                final pumpId = (s['pump'] as Map?)?['id'] as String? ?? '';
+                                final pumpData = s['pump'];
+                                final pump = (pumpData is List && (pumpData as List).isNotEmpty)
+                                    ? (pumpData as List).first as Map
+                                    : (pumpData as Map?);
+                                final pumpId = pump?['id'] as String? ?? '';
                                 final role = user?.role ?? '';
                                 if (pumpId.isNotEmpty) {
                                   if (role == 'PUMP_PERSON') {
@@ -497,9 +501,17 @@ class _ActiveShiftCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pumpName = (shift['pump'] as Map?)?['name'] ?? 'Pump';
-    final workerName =
-        (shift['assigned_worker'] as Map?)?['full_name'] ?? 'Unassigned';
+    final pumpData = shift['pump'];
+    final pump = (pumpData is List && (pumpData as List).isNotEmpty)
+        ? (pumpData as List).first as Map
+        : (pumpData as Map?);
+    final pumpName = pump?['name'] ?? 'Pump';
+    
+    final workerData = shift['assigned_worker'];
+    final worker = (workerData is List && (workerData as List).isNotEmpty)
+        ? (workerData as List).first as Map
+        : (workerData as Map?);
+    final workerName = worker?['full_name'] ?? 'Unassigned';
     final entries = shift['nozzle_entries'] as List? ?? [];
     final amount = entries.fold<double>(
         0,

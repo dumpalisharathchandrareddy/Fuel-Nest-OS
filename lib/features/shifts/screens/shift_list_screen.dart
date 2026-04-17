@@ -725,17 +725,23 @@ class _ShiftListScreenState extends ConsumerState<ShiftListScreen>
                                     onTap: () {
                                       final s = Map<String, dynamic>.from(_shifts[i] as Map);
                                       final status = s['status'] as String? ?? '';
-                                      final pumpId = (s['pump'] as Map?)?['id'] as String? ?? '';
+                                      final pumpData = s['pump'];
+                                      final pump = (pumpData is List && (pumpData as List).isNotEmpty)
+                                          ? (pumpData as List).first as Map
+                                          : (pumpData as Map?);
+                                      final pumpId = pump?['id'] as String? ?? '';
                                       final role = user?.role ?? '';
 
-                                      if (status == 'OPEN') {
+                                      if (status == 'OPEN' || status == 'SUBMITTED') {
                                         if (role == 'PUMP_PERSON') {
+                                          // Worker goes to nozzle entry
                                           context.push('/worker/nozzle/$pumpId');
                                         } else {
+                                          // Admin goes to execution (review/entry)
                                           context.push('/app/shifts/execution/${s['id']}');
                                         }
                                       } else {
-                                        // SUBMITTED or CLOSED go to reconciliation/settlement
+                                        // CLOSED goes directly to reconciliation/settlement
                                         context.push('/app/shifts/payment/${s['id']}');
                                       }
                                     },
@@ -757,9 +763,16 @@ class _ShiftCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pump = (shift['pump'] as Map?)?.cast<String, dynamic>() ?? {};
-    final worker =
-        (shift['assigned_worker'] as Map?)?.cast<String, dynamic>() ?? {};
+    final pumpData = shift['pump'];
+    final pump = (pumpData is List && pumpData.isNotEmpty)
+        ? pumpData.first as Map
+        : (pumpData as Map? ?? {});
+        
+    final workerData = shift['assigned_worker'];
+    final worker = (workerData is List && workerData.isNotEmpty)
+        ? workerData.first as Map
+        : (workerData as Map? ?? {});
+        
     final status = shift['status'] as String? ?? '';
     final entries = shift['nozzle_entries'] as List? ?? [];
     final amount = entries.fold<double>(

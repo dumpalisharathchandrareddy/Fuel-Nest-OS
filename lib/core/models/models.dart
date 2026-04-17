@@ -118,6 +118,7 @@ class NozzleEntry {
   final double saleLitres;
   final double rate;
   final double saleAmount;
+  final String? testingOverrideReason;
   // joined
   final String? nozzleLabel;
   final String? fuelType;
@@ -130,6 +131,7 @@ class NozzleEntry {
     required this.openingReading,
     this.closingReading,
     this.testingQuantity = 0,
+    this.testingOverrideReason,
     this.saleLitres = 0,
     this.rate = 0,
     this.saleAmount = 0,
@@ -150,6 +152,7 @@ class NozzleEntry {
       closingReading:
           j['closing_reading'] != null ? _d(j['closing_reading']) : null,
       testingQuantity: _d(j['testing_quantity']),
+      testingOverrideReason: j['testing_override_reason'] as String?,
       saleLitres: _d(j['sale_litres']),
       rate: _d(j['rate']),
       saleAmount: _d(j['sale_amount']),
