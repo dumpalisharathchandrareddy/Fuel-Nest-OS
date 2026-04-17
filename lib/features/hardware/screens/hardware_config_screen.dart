@@ -364,206 +364,7 @@ class _HardwareConfigScreenState extends ConsumerState<HardwareConfigScreen> {
   }
 }
 
-// ─── fuel_rate_screen.dart ────────────────────────────────────────────────────
 
-class FuelRateScreen extends ConsumerStatefulWidget {
-  const FuelRateScreen({super.key});
-  @override
-  ConsumerState<FuelRateScreen> createState() => _FuelRateScreenState();
-}
-
-class _FuelRateScreenState extends ConsumerState<FuelRateScreen> {
-  bool _loading = true;
-  String? _error;
-  List<dynamic> _rates = [];
-  final Map<String, TextEditingController> _controllers = {};
-
-  @override
-  void initState() {
-    super.initState();
-    _fetch();
-  }
-
-  @override
-  void dispose() {
-    for (final c in _controllers.values) c.dispose();
-    super.dispose();
-  }
-
-  Future<void> _fetch() async {
-    setState(() {
-      _loading = true;
-    });
-    try {
-      final db = TenantService.instance.client;
-      final user = ref.read(currentUserProvider)!;
-      // Active rate = latest per fuel_type based on effective_from
-      final allRates = await db
-          .from('FuelRate')
-          .select('id, fuel_type, rate, set_by_id, effective_from, created_at')
-          .eq('station_id', user.stationId)
-          .order('effective_from', ascending: false);
-
-      // Deduplicate: keep latest per fuel_type
-      final seen = <String>{};
-      final rates = (allRates as List).where((r) {
-        final ft = r['fuel_type'] as String;
-        if (seen.contains(ft)) return false;
-        seen.add(ft);
-        return true;
-      }).toList();
-      for (final r in rates)
-        _controllers[r['fuel_type'] as String] =
-            TextEditingController(text: r['rate']?.toString() ?? '0');
-      setState(() {
-        _rates = rates;
-        _loading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
-    }
-  }
-
-  Future<void> _saveRate(String fuelType) async {
-    final newRate = double.tryParse(_controllers[fuelType]?.text ?? '0') ?? 0;
-    if (newRate <= 0) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Enter a valid rate')));
-      return;
-    }
-    try {
-      final db = TenantService.instance.client;
-      final user = ref.read(currentUserProvider)!;
-      final now = DateTime.now().toUtc().toIso8601String();
-      await db.from('FuelRate').insert({
-        'id': const Uuid().v4(),
-        'station_id': user.stationId,
-        'fuel_type': fuelType,
-        'rate': newRate,
-        'effective_from': now,
-        'set_by_id': user.id,
-        'created_at': now
-      });
-      if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('✅ $fuelType rate updated'),
-            backgroundColor: AppColors.green));
-      _fetch();
-    } catch (e) {
-      if (mounted)
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loading)
-      return const Scaffold(
-          backgroundColor: AppColors.bgApp, body: LoadingView());
-    if (_error != null)
-      return Scaffold(
-          backgroundColor: AppColors.bgApp,
-          body: ErrorView(message: _error!, onRetry: _fetch));
-
-    return Scaffold(
-      backgroundColor: AppColors.bgApp,
-      body: ListView(padding: const EdgeInsets.all(16), children: [
-        const AppCard(
-            child: Row(children: [
-          Icon(Icons.info_outline, color: AppColors.blue, size: 16),
-          SizedBox(width: 8),
-          Expanded(
-              child: Text(
-                  'Rates shown per litre (₹/L). Changes take effect immediately for new shifts.',
-                  style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                      height: 1.4)))
-        ])),
-        const SizedBox(height: 20),
-        if (_rates.isEmpty)
-          const EmptyView(
-            title: 'No fuel rates configured',
-            subtitle: 'Rates appear here once tanks are configured',
-            icon: Icons.currency_rupee,
-          )
-        else
-          ..._rates.map((r) {
-          final fuel = r['fuel_type'] as String;
-          final fuelColor = switch (fuel) {
-            'Petrol' => AppColors.petrol,
-            'Diesel' => AppColors.diesel,
-            'Power' => AppColors.power,
-            _ => AppColors.blue
-          };
-          return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: AppCard(
-                  child: Row(children: [
-                Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                        color: fuelColor.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(10)),
-                    alignment: Alignment.center,
-                    child: Icon(Icons.local_gas_station,
-                        color: fuelColor, size: 20)),
-                const SizedBox(width: 12),
-                Expanded(
-                    child: Text(fuel,
-                        style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w600))),
-                SizedBox(
-                    width: 100,
-                    child: TextFormField(
-                      controller: _controllers[fuel],
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16),
-                      decoration: InputDecoration(
-                        prefixText: '₹',
-                        prefixStyle: const TextStyle(
-                            color: AppColors.textMuted, fontSize: 13),
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide:
-                                const BorderSide(color: AppColors.border)),
-                        enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide:
-                                const BorderSide(color: AppColors.border)),
-                        focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(
-                                color: AppColors.blue, width: 1.5)),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 10),
-                        filled: true,
-                        fillColor: AppColors.bgSurface,
-                      ),
-                    )),
-                const SizedBox(width: 8),
-                IconButton(
-                    icon: const Icon(Icons.check_circle,
-                        color: AppColors.green, size: 22),
-                    onPressed: () => _saveRate(fuel),
-                    tooltip: 'Save Rate'),
-              ])));
-        }),
-      ]),
-    );
-  }
-}
 
 // ── Modals ───────────────────────────────────────────────────────────────────
 
@@ -731,7 +532,7 @@ class _TankFormSheetState extends ConsumerState<TankFormSheet> {
               value: active,
               onChanged: (v) => setState(() => active = v),
               contentPadding: EdgeInsets.zero,
-              activeColor: AppColors.blue,
+              activeThumbColor: AppColors.blue,
             ),
             if (err != null)
               Padding(
@@ -921,7 +722,7 @@ class _PumpFormSheetState extends ConsumerState<PumpFormSheet> {
               value: active,
               onChanged: (v) => setState(() => active = v),
               contentPadding: EdgeInsets.zero,
-              activeColor: AppColors.blue,
+              activeThumbColor: AppColors.blue,
             ),
             if (err != null)
               Padding(
@@ -1168,7 +969,7 @@ class _NozzleFormSheetState extends ConsumerState<NozzleFormSheet> {
               value: active,
               onChanged: (v) => setState(() => active = v),
               contentPadding: EdgeInsets.zero,
-              activeColor: AppColors.blue,
+              activeThumbColor: AppColors.blue,
             ),
             if (err != null)
               Padding(

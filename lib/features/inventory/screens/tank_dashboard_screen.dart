@@ -144,15 +144,24 @@ class _TankDashboardScreenState extends ConsumerState<TankDashboardScreen> {
             .order('created_at', ascending: false),
       ]);
 
-      final tanks = results[0] as List;
-      final initialStocks = {
-        for (final s in results[3] as List)
-          s['tank_id']: double.parse(s['opening_litres'].toString())
-      };
-      final transactions = results[4] as List;
-      final dips = results[5] as List;
+      final tanks = (results[0] as List? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
 
-      // Group transactions by tank
+      final initialStocks = {
+        for (final s in (results[3] as List? ?? []))
+          (s as Map)['tank_id']?.toString() ?? '':
+              double.tryParse((s as Map)['opening_litres']?.toString() ?? '0') ??
+                  0.0
+      };
+
+      final transactions = (results[4] as List? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+
+      // results[3] is initialStocks
+      // results[4] is transactions
+      // results[5] is dips (currently unused in UI)
       final tankStocks = <String, double>{};
       for (final t in tanks) {
         final tid = t['id'];
@@ -171,10 +180,17 @@ class _TankDashboardScreenState extends ConsumerState<TankDashboardScreen> {
 
       setState(() {
         _tanks = tanks
-            .map((t) => {...t, 'computed_stock': tankStocks[t['id']] ?? 0.0})
+            .map((t) => <String, dynamic>{
+                  ...t,
+                  'computed_stock': tankStocks[t['id']] ?? 0.0
+                })
             .toList();
-        _orders = results[1] as List;
-        _cheques = results[2] as List;
+        _orders = (results[1] as List? ?? [])
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+        _cheques = (results[2] as List? ?? [])
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
         _loading = false;
       });
     } catch (e) {
@@ -249,7 +265,7 @@ class _TankDashboardScreenState extends ConsumerState<TankDashboardScreen> {
               else
                 ..._tanks.map((t) => Padding(
                       padding: const EdgeInsets.only(bottom: 10),
-                      child: _TankCard(tank: t),
+                      child: _TankCard(tank: Map<String, dynamic>.from(t as Map)),
                     )),
               const SizedBox(height: 20),
               SectionHeader(
@@ -452,8 +468,12 @@ class _FuelOrderScreenState extends ConsumerState<FuelOrderScreen> {
         .eq('station_id', user.stationId)
         .eq('active', true);
     setState(() {
-      _tanks = tanks;
-      if (tanks.isNotEmpty) _fuelType = tanks.first['fuel_type'] as String;
+      _tanks = (tanks as List? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      if (_tanks.isNotEmpty) {
+        _fuelType = _tanks.first['fuel_type'] as String? ?? 'Petrol';
+      }
     });
   }
 
@@ -782,7 +802,6 @@ class DipReadingScreen extends ConsumerStatefulWidget {
 
 class _DipReadingScreenState extends ConsumerState<DipReadingScreen> {
   bool _loading = true;
-  String? _error;
   bool _submitting = false;
   List<dynamic> _tanks = [];
   final Map<String, TextEditingController> _controllers = {};
@@ -817,18 +836,24 @@ class _DipReadingScreenState extends ConsumerState<DipReadingScreen> {
           .select('id, name, fuel_type, capacity_liters, low_stock_threshold')
           .eq('station_id', user.stationId)
           .eq('active', true);
-      for (final t in tanks) {
+      final list = (tanks as List? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+
+      for (final t in list) {
         _controllers[t['id'] as String] = TextEditingController(text: '0');
       }
       setState(() {
-        _tanks = tanks;
+        _tanks = list;
         _loading = false;
       });
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading tanks: $e')),
+        );
+      }
     }
   }
 

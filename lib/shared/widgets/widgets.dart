@@ -13,6 +13,7 @@ class AppButton extends StatelessWidget {
   final bool secondary;
   final IconData? icon;
   final double? width;
+  final bool small;
 
   const AppButton({
     super.key,
@@ -23,6 +24,7 @@ class AppButton extends StatelessWidget {
     this.secondary = false,
     this.icon,
     this.width,
+    this.small = false,
   });
 
   @override
@@ -46,9 +48,12 @@ class AppButton extends StatelessWidget {
             : RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         child: InkWell(
           onTap: loading ? null : onTap,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(small ? 6 : 8),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            padding: EdgeInsets.symmetric(
+              horizontal: small ? 12 : 20,
+              vertical: small ? 8 : 14,
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
@@ -73,7 +78,7 @@ class AppButton extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: fg,
-                      fontSize: 14,
+                      fontSize: small ? 12 : 14,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -413,7 +418,7 @@ class KpiCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = Color.lerp(color, Colors.transparent, 0.9)!;
+    final bgColor = color.withValues(alpha: 0.1);
 
     return AppCard(
       onTap: onTap,

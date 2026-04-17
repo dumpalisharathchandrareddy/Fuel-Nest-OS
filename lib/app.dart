@@ -19,6 +19,7 @@ import 'features/staff/screens/staff_management_screen.dart';
 import 'features/reports/screens/reports_screen.dart';
 import 'features/expenses/screens/expenses_screen.dart';
 import 'features/hardware/screens/hardware_config_screen.dart';
+import 'features/fuel_rates/screens/fuel_rate_screen.dart';
 import 'features/settings/screens/settings_screen.dart';
 import 'features/worker/screens/worker_home_screen.dart';
 

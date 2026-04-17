@@ -363,13 +363,30 @@ class _ShiftListScreenState extends ConsumerState<ShiftListScreen>
                       if (launchErr != null) ...[
                         const SizedBox(height: 12),
                         Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                                color: AppColors.redBg,
-                                borderRadius: BorderRadius.circular(8)),
-                            child: Text(launchErr!,
-                                style: const TextStyle(
-                                    color: AppColors.red, fontSize: 12))),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                              color: AppColors.redBg,
+                              borderRadius: BorderRadius.circular(8)),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(launchErr!,
+                                  style: const TextStyle(
+                                      color: AppColors.red, fontSize: 12)),
+                              if (launchErr!.contains('fuel rates')) ...[
+                                const SizedBox(height: 8),
+                                AppButton(
+                                  label: 'Set Fuel Rates',
+                                  small: true,
+                                  onTap: () {
+                                    Navigator.pop(ctx);
+                                    context.push('/app/rates');
+                                  },
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
                       ],
                       const SizedBox(height: 20),
                       Row(children: [
@@ -417,11 +434,35 @@ class _ShiftListScreenState extends ConsumerState<ShiftListScreen>
                                     final rates = await db
                                         .from('FuelRate')
                                         .select('fuel_type, rate')
-                                        .eq('station_id', user.stationId);
-                                    final rateMap = {
-                                      for (final r in rates as List)
-                                        r['fuel_type'] as String: r['rate']
-                                    };
+                                        .eq('station_id', user.stationId)
+                                        .order('effective_from', ascending: false);
+
+                                    // Map only the latest rate per fuel type
+                                    final rateMap = <String, double>{};
+                                    for (final r in rates as List) {
+                                      final ft = r['fuel_type'] as String;
+                                      if (!rateMap.containsKey(ft)) {
+                                        rateMap[ft] = double.tryParse(r['rate']?.toString() ?? '0') ?? 0;
+                                      }
+                                    }
+
+                                    // Validate that all required fuel types have a non-zero rate
+                                    final missingRates = <String>[];
+                                    for (final nozzle in nozzles as List) {
+                                      final ft = nozzle['fuel_type'] as String;
+                                      if ((rateMap[ft] ?? 0) <= 0) {
+                                        if (!missingRates.contains(ft)) missingRates.add(ft);
+                                      }
+                                    }
+
+                                    if (missingRates.isNotEmpty) {
+                                      ss(() {
+                                        launching = false;
+                                        launchErr =
+                                            'Missing fuel rates for: ${missingRates.join(", ")}. Please set fuel rates before opening a shift.';
+                                      });
+                                      return;
+                                    }
 
                                     final newShift = await db
                                         .from('Shift')
@@ -459,10 +500,11 @@ class _ShiftListScreenState extends ConsumerState<ShiftListScreen>
                                     if (ctx.mounted) Navigator.pop(ctx);
                                     if (mounted) {
                                       ScaffoldMessenger.of(context)
-                                          .showSnackBar(const SnackBar(
-                                              content: Text('✅ Shift opened'),
-                                              backgroundColor:
-                                                  AppColors.green));
+                                          .showSnackBar(SnackBar(
+                                              content: const Text('✅ Shift opened'),
+                                              backgroundColor: AppColors.green,
+                                              behavior: SnackBarBehavior.floating,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))));
                                       _fetch();
                                     }
                                   } catch (e) {

@@ -266,7 +266,7 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
       if (approve) {
         final targetList = req['target_user'] as List?;
         final targetUser = targetList != null && targetList.isNotEmpty
-            ? targetList.first as Map<String, dynamic>
+            ? Map<String, dynamic>.from(targetList.first as Map)
             : null;
         final tid = targetUser?['id'] ?? req['target_user_id'];
 
@@ -340,7 +340,7 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
                                           CrossAxisAlignment.start,
                                       children: [
                                     Text(
-                                        'User: ${req['target_user'] is List && (req['target_user'] as List).isNotEmpty ? (req['target_user'] as List).first['full_name'] : (req['target_user_id']?.toString().substring(0, 8) ?? '')}',
+                                        'User: ${req['target_user'] is List && (req['target_user'] as List).isNotEmpty ? Map<String, dynamic>.from((req['target_user'] as List).first as Map)['full_name'] : (req['target_user_id']?.toString().substring(0, 8) ?? '')}',
                                         style: const TextStyle(
                                             color: AppColors.textPrimary,
                                             fontWeight: FontWeight.w600)),
@@ -348,7 +348,7 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
                                         (req['requested_by'] as List)
                                             .isNotEmpty)
                                       Text(
-                                          'Requested by: ${(req['requested_by'] as List).first['full_name']}',
+                                          'Requested by: ${Map<String, dynamic>.from((req['requested_by'] as List).first as Map)['full_name']}',
                                           style: const TextStyle(
                                               color: AppColors.textSecondary,
                                               fontSize: 11)),
@@ -449,13 +449,13 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
                 : SliverList(
                     delegate: SliverChildBuilderDelegate(
                     (_, i) {
-                      final s = filtered[i] as Map<String, dynamic>;
+                      final s = Map<String, dynamic>.from(filtered[i] as Map);
                       final isActive = s['active'] as bool? ?? true;
                       final role = s['role'] as String? ?? '';
                       final _configs =
                           (s['salary_config'] as List?) ?? const [];
                       final config = _configs.isNotEmpty
-                          ? _configs.first as Map<String, dynamic>
+                          ? Map<String, dynamic>.from(_configs.first as Map)
                           : null;
                       final salary = config != null
                           ? double.tryParse(
@@ -476,7 +476,7 @@ class _StaffManagementScreenState extends ConsumerState<StaffManagementScreen> {
                                 height: 44,
                                 decoration: BoxDecoration(
                                     color: isActive
-                                        ? roleColor.withOpacity(0.12)
+                                        ? roleColor.withValues(alpha: 0.12)
                                         : AppColors.bgHover,
                                     borderRadius: BorderRadius.circular(12)),
                                 alignment: Alignment.center,
